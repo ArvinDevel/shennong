@@ -5,6 +5,7 @@ import org.apache.bookkeeper.shims.zk.ZooKeeperServerShim;
 import org.apache.bookkeeper.util.IOUtils;
 //import dlshade.org.apache.bookkeeper.util.LocalBookKeeper;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.distributedlog.DLMTestUtil;
 import org.apache.distributedlog.LocalDLMEmulator;
 import org.apache.distributedlog.TestAsyncReaderWriter;
 import org.apache.distributedlog.TestDistributedLogBase;
@@ -21,6 +22,12 @@ import java.io.File;
  * we can set dlog in the pom.xml
  */
 public class LocalDLMEmulatorTest {
+
+    static {
+        // org.apache.zookeeper.test.ClientBase uses FourLetterWordMain, from 3.5.3 four letter words
+        // are disabled by default due to security reasons
+        System.setProperty("zookeeper.4lw.commands.whitelist", "*");
+    }
     public static void main(String[] args) throws Exception {
         testLocalDLMEmulator();
 //        testDLMTestBase();
@@ -47,13 +54,19 @@ public class LocalDLMEmulatorTest {
                 .zkHost("127.0.0.1")
                 .zkPort(2181)
                 .shouldStartZK(true)
+                .zkTimeoutSec(100)
                 .build();
         localDLMEmulator.start();
+        System.out.println("localDLMEmulator.start finish");
     }
+
+
 
     private static void testDLMTestBase() throws Exception {
 //        BasicConfigurator.configure();
         TestDistributedLogBase.setupCluster();
+        System.out.println("setupCluster finish");
+
     }
 
     // to check whether the problem is related to LocalBookkeeper
