@@ -29,6 +29,7 @@ public class LocalDLMEmulatorTest {
         System.setProperty("zookeeper.4lw.commands.whitelist", "*");
     }
     public static void main(String[] args) throws Exception {
+
         testLocalDLMEmulator();
 //        testDLMTestBase();
 //        testLocalBookkeeper();

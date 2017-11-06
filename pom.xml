@@ -13,10 +13,12 @@
         <module>heron-dlog-connector</module>
         <module>heron-kafka-connector</module>
         <module>dlog-bk-common-test</module>
+        <module>utils</module>
     </modules>
     <properties>
         <slf4j.version>1.7.25</slf4j.version>
         <junit.version>4.8.1</junit.version>
+        <zookeeper.version>3.5.3-beta</zookeeper.version>
     </properties>
 <dependencies>
     <dependency>
