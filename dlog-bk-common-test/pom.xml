@@ -16,15 +16,15 @@
             <groupId>org.apache.distributedlog</groupId>
             <artifactId>distributedlog-core</artifactId>
             <version>0.6.0-SNAPSHOT</version>
-            <!--<classifier>shaded</classifier>-->
-            <classifier>bkshade</classifier>
+            <classifier>shaded</classifier>
+            <!--<classifier>bkshade</classifier>-->
         </dependency>
-        <dependency>
-            <groupId>org.apache.distributedlog</groupId>
-            <artifactId>distributedlog-core</artifactId>
-            <version>0.6.0-SNAPSHOT</version>
-            <classifier>bkshade-tests</classifier>
-        </dependency>
+        <!--<dependency>-->
+            <!--<groupId>org.apache.distributedlog</groupId>-->
+            <!--<artifactId>distributedlog-core</artifactId>-->
+            <!--<version>0.6.0-SNAPSHOT</version>-->
+            <!--<classifier>bkshade-tests</classifier>-->
+        <!--</dependency>-->
         <!--<dependency>-->
             <!--<groupId>org.apache.distributedlog</groupId>-->
             <!--<artifactId>distributedlog-core</artifactId>-->
@@ -48,5 +48,33 @@
         </dependency>
 
     </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <configuration>
+                    <appendAssemblyId>false</appendAssemblyId>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                    <archive>
+                        <manifest>
+                            <mainClass>me.jinsui.shennong.test.LocalDLMEmulatorTest</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>assembly</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
+    </build>
 
 </project>
