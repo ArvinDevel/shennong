@@ -14,6 +14,10 @@ import java.util.concurrent.TimeUnit;
  * To update bk-layout in zk 2017/10/24.
  */
 public class ZKClient {
+    /**
+     * @param args, 0 is host, param2 indicates type:1 dlshade
+     * @throws Exception
+     */
     public static void main(String[] args) throws Exception {
 
         final CountDownLatch latch = new CountDownLatch(1);
@@ -35,8 +39,10 @@ public class ZKClient {
         if(zkc.exists("/ledgers/LAYOUT",false) != null)
             zkc.delete("/ledgers/LAYOUT",zkc.exists("/ledgers/LAYOUT",false).getVersion());
         //todo which version does bookkeeper use actually?
-        zkc.create("/ledgers/LAYOUT", "2\ndlshade.org.apache.bookkeeper.meta.HierarchicalLedgerManagerFactory:1".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
+        if(args[1].equals("1"))
+            zkc.create("/ledgers/LAYOUT", "2\ndlshade.org.apache.bookkeeper.meta.HierarchicalLedgerManagerFactory:1".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        else
+            zkc.create("/ledgers/LAYOUT", "2\norg.apache.bookkeeper.meta.HierarchicalLedgerManagerFactory:1".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
     }
 }

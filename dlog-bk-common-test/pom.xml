@@ -16,8 +16,8 @@
             <groupId>org.apache.distributedlog</groupId>
             <artifactId>distributedlog-core</artifactId>
             <version>0.6.0-SNAPSHOT</version>
-            <classifier>shaded</classifier>
-            <!--<classifier>bkshade</classifier>-->
+            <!--<classifier>shaded</classifier>-->
+            <classifier>bkshade</classifier>
         </dependency>
         <!--<dependency>-->
             <!--<groupId>org.apache.distributedlog</groupId>-->
