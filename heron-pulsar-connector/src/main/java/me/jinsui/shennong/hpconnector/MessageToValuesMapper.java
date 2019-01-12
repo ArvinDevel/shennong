@@ -2,9 +2,9 @@ package me.jinsui.shennong.hpconnector;
 
 import com.twitter.heron.api.topology.OutputFieldsDeclarer;
 import com.twitter.heron.api.tuple.Values;
-import com.yahoo.pulsar.client.api.Message;
 
 import java.io.Serializable;
+import org.apache.pulsar.client.api.Message;
 
 public interface MessageToValuesMapper extends Serializable {
 

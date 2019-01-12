@@ -16,10 +16,10 @@
 package me.jinsui.shennong.hpconnector;
 
 import com.twitter.heron.api.spout.ISpoutOutputCollector;
-import com.yahoo.pulsar.client.api.Message;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pulsar.client.api.Message;
 
 public class MockSpoutOutputCollector implements ISpoutOutputCollector {
 

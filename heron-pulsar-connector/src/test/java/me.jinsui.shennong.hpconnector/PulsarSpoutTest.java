@@ -11,17 +11,17 @@ import com.twitter.heron.api.spout.SpoutOutputCollector;
 import com.twitter.heron.api.topology.OutputFieldsDeclarer;
 import com.twitter.heron.api.topology.TopologyContext;
 import com.twitter.heron.api.tuple.Values;
-import com.yahoo.pulsar.client.api.*;
-import me.jinsui.shennong.hpconnector.PulsarSpout;
+import org.apache.pulsar.client.api.ClientConfiguration;
+import org.apache.pulsar.client.api.ConsumerConfiguration;
+import org.apache.pulsar.client.api.Message;
+import org.apache.pulsar.client.api.Producer;
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.SubscriptionType;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import org.testng.collections.Maps;
-
-import com.yahoo.pulsar.common.policies.data.PersistentTopicStats;
-
-
 
 public class PulsarSpoutTest {
 

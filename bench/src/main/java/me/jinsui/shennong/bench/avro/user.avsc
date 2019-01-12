@@ -1,0 +1,14 @@
+{
+  "namespace": "me.jinsui.shennong.bench.avro",
+  "type": "record",
+  "name": "User",
+  "fields": [
+    {"name": "name", "type": "string"},
+    {"name": "age", "type": "int"},
+    {"name": "phone", "type": "string"},
+    {"name": "ctime", "type": "long"},
+    {"name": "weight", "type": "float"},
+    {"name": "token", "type": "bytes"},
+    {"name": "address", "type": ["string", "null"]}
+  ]
+}
