@@ -23,9 +23,8 @@ lib/
 *.#*
 dist/
 logs/
+out/
 *.pid
-
-
 
 
 # shade plugins
