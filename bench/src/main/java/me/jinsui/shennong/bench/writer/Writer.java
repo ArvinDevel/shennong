@@ -101,7 +101,7 @@ public abstract class Writer implements Runnable {
             startTime, endTime, elapsed, cumulativeEventsWritten.sum());
         log.debug("before calculate total bytes is {}", cumulativeBytesWritten.sum());
         double rate = cumulativeEventsWritten.sum() / elapsed;
-        double throughput = cumulativeEventsWritten.sum() / elapsed / 1024 / 1024;
+        double throughput = cumulativeBytesWritten.sum() / elapsed / 1024 / 1024;
 
         Histogram reportHistogram = recorder.getIntervalHistogram();
 
