@@ -48,7 +48,7 @@ public class KafkaWriter extends Writer {
                 "-r", "--rate"
             },
             description = "Write rate bytes/s across all topic")
-        public int writeRate = 1000000;
+        public double writeRate = 1000000;
 
         @Parameter(
             names = {
@@ -183,7 +183,7 @@ public class KafkaWriter extends Writer {
             numBytesForThisThread);
 
         // Acquire 1 second worth of records to have a slower ramp-up
-        RateLimiter.create(flags.writeRate / flags.numThreads).acquire(flags.writeRate / flags.numThreads);
+        RateLimiter.create(flags.writeRate / flags.numThreads).acquire((int) (flags.writeRate / flags.numThreads));
 
         long totalWritten = 0L;
         long totalBytesWritten = 0L;

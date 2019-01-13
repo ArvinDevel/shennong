@@ -16,7 +16,7 @@ public class AvroDataSource implements DataSource<GenericRecord> {
     private final int msgSize;
     private long uid = 0;
 
-    public AvroDataSource(int rate, String schemaFile) {
+    public AvroDataSource(double rate, String schemaFile) {
         this.rateLimiter = RateLimiter.create(rate);
         this.schemaFile = schemaFile;
         this.msgSize = estimateMsgSize();
