@@ -3,6 +3,7 @@ package me.jinsui.shennong.bench;
 import com.beust.jcommander.JCommander;
 import java.util.Arrays;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.writer.HDFSWriter;
 import me.jinsui.shennong.bench.writer.KafkaWriter;
 
 @Slf4j
@@ -41,8 +42,24 @@ public class StreamStorageBench {
                     new KafkaWriter(kafkaFlags).run();
                 }
             } else if (args[1].equals("hdfs")) {
-                log.warn("Currently not implemented");
-                return;
+                HDFSWriter.Flags hdfsFlags = new HDFSWriter.Flags();
+                commander = JCommander.newBuilder()
+                    .addObject(hdfsFlags)
+                    .build();
+                String[] subCmdArgs = Arrays.copyOfRange(
+                    args, 2, args.length);
+                try {
+                    commander.parse(subCmdArgs);
+                } catch (Exception e) {
+                    log.warn("Parse exception ", e);
+                    commander.usage();
+                    return;
+                }
+                if (hdfsFlags.help) {
+                    commander.usage();
+                } else {
+                    new HDFSWriter(hdfsFlags).run();
+                }
             }
         } else if (args[0].equals("read")) {
             log.warn("Currently not implemented");

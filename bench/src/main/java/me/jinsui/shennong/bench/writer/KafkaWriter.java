@@ -26,7 +26,7 @@ import org.apache.kafka.common.serialization.LongSerializer;
 
 
 /**
- * Write avro data to kafka cluster, the topic should be created before test.
+ * Write avro data to kafka cluster.
  */
 @Slf4j
 public class KafkaWriter extends Writer {
@@ -156,10 +156,13 @@ public class KafkaWriter extends Writer {
                             numBytesForThisThread);
                     } catch (Exception e) {
                         log.error("Encountered error at writing records", e);
+                        isDone.set(true);
+                        System.exit(-1);
                     }
                 });
             }
             log.info("Started {} write threads", flags.numThreads);
+            startTime = System.currentTimeMillis();
             reportStats();
         } finally {
             executor.shutdown();
@@ -211,6 +214,8 @@ public class KafkaWriter extends Writer {
                                 } else {
                                     eventsWritten.increment();
                                     bytesWritten.add(eventSize);
+                                    cumulativeEventsWritten.increment();
+                                    cumulativeBytesWritten.add(eventSize);
 
                                     long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                                         System.nanoTime() - sendTime

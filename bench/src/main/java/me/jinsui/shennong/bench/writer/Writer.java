@@ -19,8 +19,13 @@ public abstract class Writer implements Runnable {
     );
 
     // stats
+    // for interval stats output
     final LongAdder eventsWritten = new LongAdder();
     final LongAdder bytesWritten = new LongAdder();
+    // for final cumulative stats
+    final LongAdder cumulativeEventsWritten = new LongAdder();
+    final LongAdder cumulativeBytesWritten = new LongAdder();
+    long startTime;
 
     @Override
     public void run() {
@@ -89,11 +94,21 @@ public abstract class Writer implements Runnable {
     private static final DecimalFormat throughputFormat = new DecimalFormat("0.0");
     private static final DecimalFormat dec = new DecimalFormat("0.000");
 
-    static void printAggregatedStats(Recorder recorder) {
+    void printAggregatedStats(Recorder recorder) {
+        long endTime = System.currentTimeMillis();
+        double elapsed = (endTime - startTime) / 1e3;
+        log.debug("before calculate, start time {}, end time {}, elapsed {}, total event is {}",
+            startTime, endTime, elapsed, cumulativeEventsWritten.sum());
+        log.debug("before calculate total bytes is {}", cumulativeBytesWritten.sum());
+        double rate = cumulativeEventsWritten.sum() / elapsed;
+        double throughput = cumulativeEventsWritten.sum() / elapsed / 1024 / 1024;
+
         Histogram reportHistogram = recorder.getIntervalHistogram();
 
-        log.info("Aggregated latency stats --- Latency: mean: {} ms - med: {} - 95pct: {} - 99pct: {}"
+        log.info("Aggregated throughput written : {}  records/s --- {} MB/s, Aggregated latency stats"
+                + " --- Latency: mean: {} ms - med: {} - 95pct: {} - 99pct: {}"
                 + " - 99.9pct: {} - 99.99pct: {} - 99.999pct: {} - Max: {}",
+            throughputFormat.format(rate), throughputFormat.format(throughput),
             dec.format(reportHistogram.getMean() / 1000.0),
             dec.format(reportHistogram.getValueAtPercentile(50) / 1000.0),
             dec.format(reportHistogram.getValueAtPercentile(95) / 1000.0),

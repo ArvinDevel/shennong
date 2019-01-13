@@ -14,7 +14,8 @@
         <module>dlog-bk-common-test</module>
         <module>utils</module>
         <module>arrow-bk</module>
-        <module>streamstorage-bench</module>
+        <module>bench</module>
+        <module>shennong-dist</module>
     </modules>
     <properties>
         <javac.target>1.8</javac.target>
