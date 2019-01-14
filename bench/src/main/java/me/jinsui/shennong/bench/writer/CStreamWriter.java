@@ -189,15 +189,15 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
             } catch (ClientException ce) {
                 log.warn("create namespace fail ", ce);
             }
-            try {
-                for (int i = 0; i < flags.numStreams; i++) {
-                    String streamName = String.format(flags.streamName, i);
+            for (int i = 0; i < flags.numStreams; i++) {
+                String streamName = String.format(flags.streamName, i);
+                try {
                     FutureUtils.result(adminClient.createStream(flags.namespaceName, streamName, streamConf));
+                } catch (StreamExistsException see) {
+                    // swallow
+                } catch (ClientException ce) {
+                    log.warn("create schema stream fail ", ce);
                 }
-            } catch (StreamExistsException see) {
-                // swallow
-            } catch (ClientException ce) {
-                log.warn("create schema stream fail ", ce);
             }
             log.info("Successfully create schema streams, and begin open them");
         }
@@ -216,18 +216,18 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
                 .keyRouter(IntHashRouter.of())
                 .build();
             List<Pair<Integer, Stream<Integer, GenericRecord>>> streams = new ArrayList<>(flags.numStreams);
-            try {
-                for (int i = 0; i < flags.numStreams; i++) {
-                    String streamName = String.format(flags.streamName, i);
+            for (int i = 0; i < flags.numStreams; i++) {
+                String streamName = String.format(flags.streamName, i);
+                try {
                     Stream<Integer, GenericRecord> stream = FutureUtils.result(storageClient.openStream(streamName, streamConfig));
                     streams.add(Pair.of(i, stream));
+                } catch (StreamNotFoundException snfe) {
+                    log.error("stream not found ", snfe);
+                    return;
+                } catch (Exception ce) {
+                    log.error("open stream fail ", ce);
+                    return;
                 }
-            } catch (StreamNotFoundException snfe) {
-                log.error("stream not found ", snfe);
-                return;
-            } catch (Exception ce) {
-                log.error("open stream fail ", ce);
-                return;
             }
             log.info("Successfully open streams, and begin write to them");
             execute(streams);
