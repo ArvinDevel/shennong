@@ -42,7 +42,7 @@ public class HDFSWriter extends Writer {
                 "-u", "--url"
             },
             description = "HDFS cluster namenode url")
-        public String url = "localhost:9000";
+        public String url = "hdfs://localhost:9000";
 
         @Parameter(
             names = {
@@ -241,7 +241,14 @@ public class HDFSWriter extends Writer {
                 if (dataSource.hasNext()) {
                     GenericRecord msg = dataSource.getNext();
                     final long sendTime = System.nanoTime();
-                    writers.get(i).write(msg);
+                    if(totalWritten % 100000 == 0) {
+                        log.info("before write msg");
+                        writers.get(i).write(msg);
+                        log.info("after write msg");
+                    } else {
+                        writers.get(i).write(msg);
+                    }
+
                     long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                         System.nanoTime() - sendTime
                     );

@@ -9,6 +9,6 @@
     {"name": "ctime", "type": "long"},
     {"name": "weight", "type": "float"},
     {"name": "token", "type": "bytes"},
-    {"name": "address", "type": ["string", "null"]}
+    {"name": "address", "type": "string"}
   ]
 }
