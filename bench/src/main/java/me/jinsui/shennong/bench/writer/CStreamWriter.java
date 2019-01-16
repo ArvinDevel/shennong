@@ -157,11 +157,9 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
 
     }
 
-    private final DataSource<GenericRecord> dataSource;
     private final Flags flags;
 
     public CStreamWriter(Flags flags) {
-        this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
         this.flags = flags;
     }
 
@@ -296,10 +294,8 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
             numRecordsForThisThread,
             numBytesForThisThread);
 
+        DataSource<GenericRecord> dataSource = new AvroDataSource(flags.writeRate / flags.numThreads, flags.schemaFile);
         int key = 0;
-
-        // Acquire 1 second worth of records to have a slower ramp-up
-        RateLimiter.create(flags.writeRate / flags.numThreads).acquire((int) (flags.writeRate / flags.numThreads));
 
         long totalWritten = 0L;
         long totalBytesWritten = 0L;

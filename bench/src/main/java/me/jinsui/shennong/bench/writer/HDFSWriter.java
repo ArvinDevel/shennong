@@ -3,7 +3,6 @@ package me.jinsui.shennong.bench.writer;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import com.google.common.util.concurrent.RateLimiter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -124,10 +123,8 @@ public class HDFSWriter extends Writer {
     }
 
     private final Flags flags;
-    private final DataSource<GenericRecord> dataSource;
 
     public HDFSWriter(Flags flags) {
-        this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
         this.flags = flags;
     }
 
@@ -217,8 +214,7 @@ public class HDFSWriter extends Writer {
             numRecordsForThisThread,
             numBytesForThisThread);
 
-        // Acquire 1 second worth of records to have a slower ramp-up
-        RateLimiter.create(flags.writeRate / flags.numThreads).acquire((int) (flags.writeRate / flags.numThreads));
+        DataSource<GenericRecord> dataSource = new AvroDataSource(flags.writeRate / flags.numThreads, flags.schemaFile);
 
         long totalWritten = 0L;
         long totalBytesWritten = 0L;
@@ -241,13 +237,7 @@ public class HDFSWriter extends Writer {
                 if (dataSource.hasNext()) {
                     GenericRecord msg = dataSource.getNext();
                     final long sendTime = System.nanoTime();
-                    if(totalWritten % 100000 == 0) {
-                        log.info("before write msg");
-                        writers.get(i).write(msg);
-                        log.info("after write msg");
-                    } else {
-                        writers.get(i).write(msg);
-                    }
+                    writers.get(i).write(msg);
 
                     long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                         System.nanoTime() - sendTime

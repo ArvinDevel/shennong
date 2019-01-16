@@ -95,15 +95,11 @@ public class KafkaWriter extends Writer {
     }
 
     private final Flags flags;
-    private final DataSource<GenericRecord> dataSource;
-    private final KafkaProducer<Long, GenericRecord> producer;
     private final Properties props;
 
     public KafkaWriter(Flags flags) {
-        this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
         this.flags = flags;
         this.props = newKafkaProperties(flags);
-        producer = new KafkaProducer<>(props);
     }
 
     private Properties newKafkaProperties(Flags flags) {
@@ -182,8 +178,9 @@ public class KafkaWriter extends Writer {
             numRecordsForThisThread,
             numBytesForThisThread);
 
-        // Acquire 1 second worth of records to have a slower ramp-up
-        RateLimiter.create(flags.writeRate / flags.numThreads).acquire((int) (flags.writeRate / flags.numThreads));
+        DataSource<GenericRecord> dataSource = new AvroDataSource(flags.writeRate / flags.numThreads, flags.schemaFile);
+        KafkaProducer<Long, GenericRecord> producer = new KafkaProducer<>(props);
+
 
         long totalWritten = 0L;
         long totalBytesWritten = 0L;
