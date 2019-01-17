@@ -5,7 +5,6 @@ import static org.apache.bookkeeper.stream.protocol.ProtocolConstants.DEFAULT_ST
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import com.google.common.util.concurrent.RateLimiter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -298,8 +297,6 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
 
         int key = 0;
 
-        // Acquire 1 second worth of records to have a slower ramp-up
-        RateLimiter.create(flags.writeRate / flags.numThreads).acquire((int) (flags.writeRate / flags.numThreads));
 
         long totalWritten = 0L;
         long totalBytesWritten = 0L;
