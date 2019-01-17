@@ -114,6 +114,20 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
 
         @Parameter(
             names = {
+                "-inr", "--num-streams"
+            },
+            description = "Number of init ranges of the stream")
+        public int initNumRanges = 1;
+
+        @Parameter(
+            names = {
+                "-mnr", "--min-num-ranges"
+            },
+            description = "Number of min ranges of the stream")
+        public int minNumRanges = 1;
+
+        @Parameter(
+            names = {
                 "-t", "--threads"
             },
             description = "Number of threads writing")
@@ -346,7 +360,7 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
         }
     }
 
-    private static StreamConfiguration newStreamConfiguration() {
+    private StreamConfiguration newStreamConfiguration() {
         StreamSchemaInfo streamSchemaInfo = StreamSchemaInfo.newBuilder()
             .setKeySchema(SchemaInfo.newBuilder()
                 .setSchemaType(SchemaType.INT32)
@@ -360,6 +374,8 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
 
         return StreamConfiguration.newBuilder(DEFAULT_STREAM_CONF)
             .setSchemaInfo(streamSchemaInfo)
+            .setMinNumRanges(flags.minNumRanges)
+            .setInitialNumRanges(flags.initNumRanges)
             .build();
     }
 }
