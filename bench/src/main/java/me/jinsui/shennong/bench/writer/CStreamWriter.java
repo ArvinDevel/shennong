@@ -5,6 +5,7 @@ import static org.apache.bookkeeper.stream.protocol.ProtocolConstants.DEFAULT_ST
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -93,6 +94,13 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
 
         @Parameter(
             names = {
+                "-fdms", "--flush-duration-ms"
+            },
+            description = "Generating event set duration")
+        public int flushDurationMs = 1;
+
+        @Parameter(
+            names = {
                 "-nn", "--namespace-name"
             },
             description = "Namespace name")
@@ -114,7 +122,7 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
 
         @Parameter(
             names = {
-                "-inr", "--num-streams"
+                "-inr", "--init-num-ranges"
             },
             description = "Number of init ranges of the stream")
         public int initNumRanges = 1;
@@ -296,7 +304,8 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
                double writeRate,
                long numRecordsForThisThread,
                long numBytesForThisThread) throws Exception {
-        WriterConfig writerConfig = WriterConfig.builder().build();
+        WriterConfig writerConfig = WriterConfig.builder()
+            .flushDuration(Duration.ofMillis(flags.flushDurationMs)).build();
         List<CompletableFuture<Writer<Integer, GenericRecord>>> writerFutures = streams.stream()
             .map(stream -> stream.openWriter(writerConfig))
             .collect(Collectors.toList());
