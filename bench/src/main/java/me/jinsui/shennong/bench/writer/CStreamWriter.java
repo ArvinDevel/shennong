@@ -155,27 +155,6 @@ public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
             description = "Number of bytes to write in total. If 0, it will keep writing")
         public long numBytes = 0;
 
-        @Parameter(
-            names = {
-                "-e", "--ensemble-size"
-            },
-            description = "Ledger ensemble size")
-        public int ensembleSize = 1;
-
-        @Parameter(
-            names = {
-                "-w", "--write-quorum-size"
-            },
-            description = "Ledger write quorum size")
-        public int writeQuorumSize = 1;
-
-        @Parameter(
-            names = {
-                "-a", "--ack-quorum-size"
-            },
-            description = "Ledger ack quorum size")
-        public int ackQuorumSize = 1;
-
     }
 
     private final DataSource<GenericRecord> dataSource;
