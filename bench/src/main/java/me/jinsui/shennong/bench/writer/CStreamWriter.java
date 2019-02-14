@@ -50,7 +50,7 @@ import org.apache.commons.lang3.tuple.Pair;
  * Write to CStream.
  */
 @Slf4j
-public class CStreamWriter extends me.jinsui.shennong.bench.writer.Writer {
+public class CStreamWriter extends WriterBase {
 
     /**
      * Flags for the write command.

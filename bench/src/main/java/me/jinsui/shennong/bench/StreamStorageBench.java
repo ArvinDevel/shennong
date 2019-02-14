@@ -3,6 +3,7 @@ package me.jinsui.shennong.bench;
 import com.beust.jcommander.JCommander;
 import java.util.Arrays;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.reader.CStreamReader;
 import me.jinsui.shennong.bench.writer.CStreamWriter;
 import me.jinsui.shennong.bench.writer.HDFSWriter;
 import me.jinsui.shennong.bench.writer.KafkaWriter;
@@ -82,8 +83,29 @@ public class StreamStorageBench {
                 }
             }
         } else if (args[0].equals("read")) {
-            log.warn("Currently not implemented");
-            return;
+            if (args[1].equals("cstream")) {
+                CStreamReader.Flags cstreamFlags = new CStreamReader.Flags();
+                commander = JCommander.newBuilder()
+                    .addObject(cstreamFlags)
+                    .build();
+                String[] subCmdArgs = Arrays.copyOfRange(
+                    args, 2, args.length);
+                try {
+                    commander.parse(subCmdArgs);
+                } catch (Exception e) {
+                    log.warn("Parse exception ", e);
+                    commander.usage();
+                    return;
+                }
+                if (cstreamFlags.help) {
+                    commander.usage();
+                } else {
+                    new CStreamReader(cstreamFlags).run();
+                }
+            } else {
+                log.warn("Currently not implemented");
+                return;
+            }
         }
     }
 }

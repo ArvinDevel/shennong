@@ -9,7 +9,7 @@ import org.HdrHistogram.Histogram;
 import org.HdrHistogram.Recorder;
 
 @Slf4j
-public abstract class Writer implements Runnable {
+public abstract class WriterBase implements Runnable {
     final AtomicBoolean isDone = new AtomicBoolean(false);
     final Recorder recorder = new Recorder(
         TimeUnit.SECONDS.toMillis(120000), 5

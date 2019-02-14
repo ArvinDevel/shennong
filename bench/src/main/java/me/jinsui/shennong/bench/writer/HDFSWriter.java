@@ -28,7 +28,7 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName;
  * Write avro data to hdfs as parquet format.
  */
 @Slf4j
-public class HDFSWriter extends Writer {
+public class HDFSWriter extends WriterBase {
 
     /**
      * Flags for the write command.

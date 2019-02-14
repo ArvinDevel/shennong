@@ -27,7 +27,7 @@ import org.apache.kafka.common.serialization.LongSerializer;
  * Write avro data to kafka cluster.
  */
 @Slf4j
-public class KafkaWriter extends Writer {
+public class KafkaWriter extends WriterBase {
 
     /**
      * Flags for the write command.
