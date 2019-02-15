@@ -247,6 +247,7 @@ public class CStreamReader extends ReaderBase {
                 });
             }
             log.info("Started {} read threads", flags.numThreads);
+            startTime = System.currentTimeMillis();
             reportStats();
         } finally {
             executor.shutdown();
@@ -277,7 +278,7 @@ public class CStreamReader extends ReaderBase {
                     final long receiveTime = System.currentTimeMillis();
                     eventsRead.add(readEvents.numEvents());
                     bytesRead.add(readEvents.getEstimatedSize());
-                    cumulativeEventsRead.increment();
+                    cumulativeEventsRead.add(readEvents.numEvents());
                     cumulativeBytesRead.add(readEvents.getEstimatedSize());
 
                     for (int j = 0; j < readEvents.numEvents(); j++) {

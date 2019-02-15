@@ -4,6 +4,7 @@ import com.beust.jcommander.JCommander;
 import java.util.Arrays;
 import lombok.extern.slf4j.Slf4j;
 import me.jinsui.shennong.bench.reader.CStreamReader;
+import me.jinsui.shennong.bench.reader.KafkaReader;
 import me.jinsui.shennong.bench.writer.CStreamWriter;
 import me.jinsui.shennong.bench.writer.HDFSWriter;
 import me.jinsui.shennong.bench.writer.KafkaWriter;
@@ -101,6 +102,25 @@ public class StreamStorageBench {
                     commander.usage();
                 } else {
                     new CStreamReader(cstreamFlags).run();
+                }
+            } else if (args[1].equals("kafka")) {
+                KafkaReader.Flags kafkaFlags = new KafkaReader.Flags();
+                commander = JCommander.newBuilder()
+                    .addObject(kafkaFlags)
+                    .build();
+                String[] subCmdArgs = Arrays.copyOfRange(
+                    args, 2, args.length);
+                try {
+                    commander.parse(subCmdArgs);
+                } catch (Exception e) {
+                    log.warn("Parse exception ", e);
+                    commander.usage();
+                    return;
+                }
+                if (kafkaFlags.help) {
+                    commander.usage();
+                } else {
+                    new KafkaReader(kafkaFlags).run();
                 }
             } else {
                 log.warn("Currently not implemented");
