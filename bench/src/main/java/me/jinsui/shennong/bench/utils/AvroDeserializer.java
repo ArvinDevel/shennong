@@ -1,6 +1,7 @@
 package me.jinsui.shennong.bench.utils;
 
 import java.io.File;
+import me.jinsui.shennong.bench.avro.User;
 import org.apache.avro.Schema;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
@@ -24,8 +25,7 @@ public class AvroDeserializer<T extends SpecificRecordBase> implements Deseriali
     @Override
     public T deserialize(String topic, byte[] data) {
         try {
-            Schema schema = new Parser().parse(new File("me/jinsui/shennong/bench/avro/user.avsc"));
-            DatumReader<T> userDatumReader = new SpecificDatumReader<>(schema);
+            DatumReader<T> userDatumReader = new SpecificDatumReader<>(User.getClassSchema());
             BinaryDecoder binaryEncoder = DecoderFactory.get().directBinaryDecoder(new ByteArrayInputStream(data), null);
             return userDatumReader.read(null, binaryEncoder);
         } catch (IOException ioe) {
