@@ -20,6 +20,8 @@ public class AvroSerializer<T extends SpecificRecordBase> implements Serializer<
 
     @Override
     public byte[] serialize(String topic, T data) {
+        if (data == null)
+            return null;
         try {
             DatumWriter<T> userDatumWriter = new SpecificDatumWriter<>(data.getSchema());
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();

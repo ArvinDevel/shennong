@@ -14,12 +14,28 @@ public class AvroDataSource implements DataSource<GenericRecord> {
     private final String schemaFile;
     private final String mockStr = "mockName";
     private final int msgSize;
-    private long uid = 0;
+    private final User mockUser;
 
     public AvroDataSource(double rate, String schemaFile) {
         this.rateLimiter = RateLimiter.create(rate);
         this.schemaFile = schemaFile;
         this.msgSize = estimateMsgSize();
+        this.mockUser = getMockUser();
+    }
+
+    private User getMockUser() {
+        ByteBuffer mockBytes = ByteBuffer.allocate(8);
+        mockBytes.putLong(ThreadLocalRandom.current().nextLong());
+        mockBytes.flip();
+        return User.newBuilder()
+            .setName(mockStr)
+            .setAddress(mockStr)
+            .setPhone(mockStr)
+            .setToken(mockBytes)
+            .setAge(ThreadLocalRandom.current().nextInt())
+            .setWeight(ThreadLocalRandom.current().nextFloat())
+            .setCtime(System.currentTimeMillis())
+            .build();
     }
 
     private int estimateMsgSize() {
@@ -60,18 +76,7 @@ public class AvroDataSource implements DataSource<GenericRecord> {
     }
 
     public GenericRecord getNext() {
-        ByteBuffer mockBytes = ByteBuffer.allocate(8);
-        mockBytes.putLong(ThreadLocalRandom.current().nextLong());
-        mockBytes.flip();
-        return User.newBuilder()
-            .setName(mockStr)
-            .setAddress(mockStr)
-            .setPhone(mockStr)
-            .setToken(mockBytes)
-            .setAge(ThreadLocalRandom.current().nextInt())
-            .setWeight(ThreadLocalRandom.current().nextFloat())
-            .setCtime(System.currentTimeMillis())
-            .build();
+        return mockUser;
     }
 
     @Override

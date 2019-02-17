@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -21,6 +22,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.errors.SerializationException;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.LongSerializer;
 
 /**
@@ -40,6 +42,20 @@ public class KafkaWriter extends WriterBase {
             },
             description = "Kafka cluster url")
         public String url = "localhost:9092";
+
+        @Parameter(
+            names = {
+                "-vt", "--value-type"
+            },
+            description = "Value type, default is 0, indicating avro, 1 indicatates byte[],")
+        public int valueType = 0;
+
+        @Parameter(
+            names = {
+                "-vs", "--value-size"
+            },
+            description = "Value size, used for byte[] size")
+        public int valueSize = 100;
 
         @Parameter(
             names = {
@@ -95,13 +111,30 @@ public class KafkaWriter extends WriterBase {
     private final Flags flags;
     private final DataSource<GenericRecord> dataSource;
     private final KafkaProducer<Long, GenericRecord> producer;
-    private final Properties props;
+    private final KafkaProducer<Long, byte[]> bytesProducer;
+    private final byte[] payload;
+
 
     public KafkaWriter(Flags flags) {
         this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
         this.flags = flags;
-        this.props = newKafkaProperties(flags);
-        producer = new KafkaProducer<>(props);
+        if (flags.valueType > 0) {
+            this.producer = null;
+            this.bytesProducer = new KafkaProducer<>(newBytesValueKafkaProperties(flags));
+            Random random = new Random(0);
+            if (flags.valueSize < 1) {
+                log.error("Value size should larger than 0, use 10 bytes");
+                flags.valueSize = 10;
+            }
+            payload = new byte[flags.valueSize];
+            for (int i = 0; i < payload.length; ++i)
+                payload[i] = (byte) (random.nextInt(26) + 65);
+
+        } else {
+            this.producer = new KafkaProducer<>(newKafkaProperties(flags));
+            this.bytesProducer = null;
+            this.payload = null;
+        }
     }
 
     private Properties newKafkaProperties(Flags flags) {
@@ -111,6 +144,16 @@ public class KafkaWriter extends WriterBase {
         props.put(ProducerConfig.RETRIES_CONFIG, 0);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, LongSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, AvroSerializer.class);
+        return props;
+    }
+
+    private Properties newBytesValueKafkaProperties(Flags flags) {
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, flags.url);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRIES_CONFIG, 0);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, LongSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
         return props;
     }
 
@@ -180,11 +223,15 @@ public class KafkaWriter extends WriterBase {
             numRecordsForThisThread,
             numBytesForThisThread);
 
-
         long totalWritten = 0L;
         long totalBytesWritten = 0L;
         int eventSize = dataSource.getEventSize();
         final int numStream = streams.size();
+        // create topicNames pre to avoid redundant overhead
+        String[] topicNames = new String[numStream];
+        for (int i = 0; i < numStream; i++) {
+            topicNames[i] = String.format(flags.topicName, i);
+        }
         while (true) {
             for (int i = 0; i < numStream; i++) {
                 if (numRecordsForThisThread > 0
@@ -198,28 +245,50 @@ public class KafkaWriter extends WriterBase {
                 totalWritten++;
                 totalBytesWritten += eventSize;
                 if (dataSource.hasNext()) {
-                    GenericRecord msg = dataSource.getNext();
                     final long sendTime = System.nanoTime();
                     try {
-                        producer.send(new ProducerRecord<>(String.format(flags.topicName, i), (long) msg.get("ctime"), msg),
-                            (metadata, exception) -> {
-                                if (null != exception) {
-                                    log.error("Write fail", exception);
-                                    isDone.set(true);
-                                    System.exit(-1);
-                                } else {
-                                    eventsWritten.increment();
-                                    bytesWritten.add(eventSize);
-                                    cumulativeEventsWritten.increment();
-                                    cumulativeBytesWritten.add(eventSize);
+                        if (flags.valueType > 0) {
+                            bytesProducer.send(new ProducerRecord<>(topicNames[i], System.currentTimeMillis(), payload),
+                                (metadata, exception) -> {
+                                    if (null != exception) {
+                                        log.error("Write fail", exception);
+                                        isDone.set(true);
+                                        System.exit(-1);
+                                    } else {
+                                        eventsWritten.increment();
+                                        bytesWritten.add(flags.valueSize);
+                                        cumulativeEventsWritten.increment();
+                                        cumulativeBytesWritten.add(flags.valueSize);
 
-                                    long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
-                                        System.nanoTime() - sendTime
-                                    );
-                                    recorder.recordValue(latencyMicros);
-                                    cumulativeRecorder.recordValue(latencyMicros);
-                                }
-                            });
+                                        long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                            System.nanoTime() - sendTime
+                                        );
+                                        recorder.recordValue(latencyMicros);
+                                        cumulativeRecorder.recordValue(latencyMicros);
+                                    }
+                                });
+                        } else {
+                            GenericRecord msg = dataSource.getNext();
+                            producer.send(new ProducerRecord<>(topicNames[i], System.currentTimeMillis(), msg),
+                                (metadata, exception) -> {
+                                    if (null != exception) {
+                                        log.error("Write fail", exception);
+                                        isDone.set(true);
+                                        System.exit(-1);
+                                    } else {
+                                        eventsWritten.increment();
+                                        bytesWritten.add(eventSize);
+                                        cumulativeEventsWritten.increment();
+                                        cumulativeBytesWritten.add(eventSize);
+
+                                        long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                            System.nanoTime() - sendTime
+                                        );
+                                        recorder.recordValue(latencyMicros);
+                                        cumulativeRecorder.recordValue(latencyMicros);
+                                    }
+                                });
+                        }
                     } catch (final SerializationException se) {
                         log.error("Serialize msg fail ", se);
                         isDone.set(true);
