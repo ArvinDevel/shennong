@@ -110,7 +110,6 @@ public class KafkaWriter extends WriterBase {
 
     private final Flags flags;
     private final DataSource<GenericRecord> dataSource;
-    private final KafkaProducer<Long, GenericRecord> producer;
     private final KafkaProducer<Long, byte[]> bytesProducer;
     private final byte[] payload;
 
@@ -119,7 +118,6 @@ public class KafkaWriter extends WriterBase {
         this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
         this.flags = flags;
         if (flags.valueType > 0) {
-            this.producer = null;
             this.bytesProducer = new KafkaProducer<>(newBytesValueKafkaProperties(flags));
             Random random = new Random(0);
             if (flags.valueSize < 1) {
@@ -131,7 +129,6 @@ public class KafkaWriter extends WriterBase {
                 payload[i] = (byte) (random.nextInt(26) + 65);
 
         } else {
-            this.producer = new KafkaProducer<>(newKafkaProperties(flags));
             this.bytesProducer = null;
             this.payload = null;
         }
@@ -223,6 +220,8 @@ public class KafkaWriter extends WriterBase {
             numRecordsForThisThread,
             numBytesForThisThread);
 
+        // one thread use one dedicated producer to avoid shared resource contention
+        KafkaProducer<Long, GenericRecord> producer = new KafkaProducer<>(newKafkaProperties(flags));
         long totalWritten = 0L;
         long totalBytesWritten = 0L;
         int eventSize = dataSource.getEventSize();
