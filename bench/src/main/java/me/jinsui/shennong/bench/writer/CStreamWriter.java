@@ -323,7 +323,7 @@ public class CStreamWriter extends WriterBase {
                     WriteEventBuilder<Integer, GenericRecord> eventBuilder = writers.get(i).eventBuilder();
                     CompletableFuture<WriteResult> eventFuture = writers.get(i).write(eventBuilder.withKey(key++)
                         .withValue(genericRecord)
-                        .withTimestamp(sendTime)
+                        .withTimestamp(System.currentTimeMillis())
                         .build());
                     eventFuture.thenAccept(writeResult -> {
 

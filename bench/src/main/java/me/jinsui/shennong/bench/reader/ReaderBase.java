@@ -65,16 +65,16 @@ public abstract class ReaderBase implements Runnable {
             reportHistogram = recorder.getIntervalHistogram(reportHistogram);
 
             log.info(
-                "Throughput read : {}  records/s --- {} MB/s --- Latency: mean:"
+                "Throughput read : {}  records/s --- {} MB/s --- E2E Latency: mean:"
                     + " {} ms - med: {} - 95pct: {} - 99pct: {} - 99.9pct: {} - 99.99pct: {} - Max: {}",
                 throughputFormat.format(rate), throughputFormat.format(throughput),
-                dec.format(reportHistogram.getMean() / 1000.0),
-                dec.format(reportHistogram.getValueAtPercentile(50) / 1000.0),
-                dec.format(reportHistogram.getValueAtPercentile(95) / 1000.0),
-                dec.format(reportHistogram.getValueAtPercentile(99) / 1000.0),
-                dec.format(reportHistogram.getValueAtPercentile(99.9) / 1000.0),
-                dec.format(reportHistogram.getValueAtPercentile(99.99) / 1000.0),
-                dec.format(reportHistogram.getMaxValue() / 1000.0));
+                dec.format(reportHistogram.getMean()),
+                dec.format(reportHistogram.getValueAtPercentile(50)),
+                dec.format(reportHistogram.getValueAtPercentile(95)),
+                dec.format(reportHistogram.getValueAtPercentile(99)),
+                dec.format(reportHistogram.getValueAtPercentile(99.9)),
+                dec.format(reportHistogram.getValueAtPercentile(99.99)),
+                dec.format(reportHistogram.getMaxValue()));
 
             reportHistogram.reset();
 
@@ -99,14 +99,14 @@ public abstract class ReaderBase implements Runnable {
                 + " --- Latency: mean: {} ms - med: {} - 95pct: {} - 99pct: {}"
                 + " - 99.9pct: {} - 99.99pct: {} - 99.999pct: {} - Max: {}",
             throughputFormat.format(rate), throughputFormat.format(throughput),
-            dec.format(reportHistogram.getMean() / 1000.0),
-            dec.format(reportHistogram.getValueAtPercentile(50) / 1000.0),
-            dec.format(reportHistogram.getValueAtPercentile(95) / 1000.0),
-            dec.format(reportHistogram.getValueAtPercentile(99) / 1000.0),
-            dec.format(reportHistogram.getValueAtPercentile(99.9) / 1000.0),
-            dec.format(reportHistogram.getValueAtPercentile(99.99) / 1000.0),
-            dec.format(reportHistogram.getValueAtPercentile(99.999) / 1000.0),
-            dec.format(reportHistogram.getMaxValue() / 1000.0));
+            dec.format(reportHistogram.getMean()),
+            dec.format(reportHistogram.getValueAtPercentile(50)),
+            dec.format(reportHistogram.getValueAtPercentile(95)),
+            dec.format(reportHistogram.getValueAtPercentile(99)),
+            dec.format(reportHistogram.getValueAtPercentile(99.9)),
+            dec.format(reportHistogram.getValueAtPercentile(99.99)),
+            dec.format(reportHistogram.getValueAtPercentile(99.999)),
+            dec.format(reportHistogram.getMaxValue()));
     }
 
 }
