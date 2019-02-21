@@ -58,6 +58,13 @@ public class KafkaReader extends ReaderBase {
 
         @Parameter(
             names = {
+                "-cp", "--consume-position"
+            },
+            description = "Consume position, default 0 earliest, otherwise latest")
+        public int consumePosition = 0;
+
+        @Parameter(
+            names = {
                 "-sf", "--schema-file"
             },
             description = "Schema represented using Avro, used in complex mode")
@@ -196,6 +203,9 @@ public class KafkaReader extends ReaderBase {
         props.put("auto.commit.interval.ms", "1000");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, LongDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, AvroDeserializer.class);
+        if (flags.consumePosition == 0) {
+            props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        }
         return props;
     }
 }
