@@ -182,12 +182,18 @@ public class KafkaReader extends ReaderBase {
     private void read(List<KafkaConsumer> consumersInThisThread) {
         log.info("Read thread started with : topics = {},", consumersInThisThread);
 
+        String[] readFields = flags.readColumn.split(",");
         while (true) {
             for (KafkaConsumer consumer : consumersInThisThread) {
                 ConsumerRecords<Long, GenericRecord> records = consumer.poll(flags.pollTimeoutMs);
                 eventsRead.add(records.count());
                 cumulativeEventsRead.add(records.count());
+                // filter according to read column
                 for (ConsumerRecord<Long, GenericRecord> record : records) {
+                    for (String field : readFields) {
+                        Object data = record.value().get(field);
+                    }
+                    // TODO how to estimate field value size
                     bytesRead.add(record.serializedValueSize());
                     cumulativeBytesRead.add(record.serializedValueSize());
                 }
