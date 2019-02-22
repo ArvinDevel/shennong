@@ -338,9 +338,9 @@ public class CStreamReader extends ReaderBase {
                     if (columnVectors.hasNext()) {
                         ColumnVector columnVector = columnVectors.next(100, TimeUnit.MILLISECONDS);
                         if (null != columnVector) {
-                            cumulativeEventsRead.increment();
+                            cumulativeEventsRead.add(columnVector.num());
                             cumulativeBytesRead.add(columnVector.estimatedSize());
-                            eventsRead.increment();
+                            eventsRead.add(columnVector.num());
                             bytesRead.add(columnVector.estimatedSize());
                             if (((EventPositionImpl) columnVector.position()).getRangeSeqNum() % 1000 == 0) {
                                 log.info("Column vector's stream is {}, end position is {} ",
