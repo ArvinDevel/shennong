@@ -200,9 +200,8 @@ public class KafkaReader extends ReaderBase {
         // set consume position to head compulsively to avoid can't read from head again after read once
         if (flags.consumePosition == 0) {
             for (KafkaConsumer consumer : consumersInThisThread) {
-                for (TopicPartition topicPartition : (Set<TopicPartition>) consumer.assignment()) {
-                    consumer.seekToBeginning(singleton(topicPartition));
-                }
+                consumer.seekToBeginning(consumer.assignment());
+                log.info("consumer {} has partitions {} ", consumer, consumer.assignment());
             }
         }
         String[] readFields = flags.readColumn.split(",");

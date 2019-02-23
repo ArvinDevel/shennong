@@ -33,10 +33,9 @@ BENCH_CLASSPATH="`dirname $BENCH_LOG_CONF`:$BENCH_CLASSPATH"
 
 # Build the OPTs
 GC_OPTS=$(build_cli_jvm_opts ${BENCH_LOG_DIR} "ssbench-gc.log")
-NETTY_OPTS=$(build_netty_opts)
 LOGGING_OPTS=$(build_cli_logging_opts ${BENCH_LOG_CONF} ${BENCH_LOG_DIR} ${BENCH_LOG_FILE} ${BENCH_ROOT_LOGGER})
 
-OPTS="${OPTS} -cp ${BENCH_CLASSPATH} ${GC_OPTS} ${NETTY_OPTS} ${LOGGING_OPTS} ${BENCH_EXTRA_OPTS}"
+OPTS="${OPTS} -cp ${BENCH_CLASSPATH} ${GC_OPTS} ${LOGGING_OPTS} ${BENCH_EXTRA_OPTS}"
 
 #Change to SN_HOME to support relative paths
 cd "$SN_HOME"
