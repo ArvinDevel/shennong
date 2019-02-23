@@ -113,6 +113,13 @@ public class KafkaReader extends ReaderBase {
             description = "Whether read endless or not, default 1/true, set to 0/false to stats ")
         public int readEndless = 1;
 
+        @Parameter(
+            names = {
+                "-mbn", "--max-backoff-num"
+            },
+            description = "Max backoff number")
+        public int maxBackoffNum = 100;
+
     }
 
     protected final Flags flags;
@@ -199,12 +206,17 @@ public class KafkaReader extends ReaderBase {
             }
         }
         String[] readFields = flags.readColumn.split(",");
+        int backoffNum = 0;
         while (true) {
             for (KafkaConsumer consumer : consumersInThisThread) {
                 ConsumerRecords<Long, GenericRecord> records = consumer.poll(flags.pollTimeoutMs);
                 if (records.count() == 0 && flags.readEndless == 0) {
-                    log.info("No more data after {} ms, shut down", flags.pollTimeoutMs);
-                    System.exit(-1);
+                    if (backoffNum > flags.maxBackoffNum) {
+                        log.info("No more data after {} ms, shut down", flags.pollTimeoutMs);
+                        System.exit(-1);
+                    } else {
+                        backoffNum++;
+                    }
                 }
                 eventsRead.add(records.count());
                 cumulativeEventsRead.add(records.count());
