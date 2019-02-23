@@ -154,6 +154,20 @@ public class CStreamReader extends ReaderBase {
             description = "ReadAhead Cache Size, in bytes"
         )
         public int readAheadCatchSize = 8 * 1024 * 1024;
+
+        @Parameter(
+            names = {
+                "-pt", "--poll-timeout-ms"
+            },
+            description = "Timeout of consumer poll")
+        public long pollTimeoutMs = 100;
+
+        @Parameter(
+            names = {
+                "-re", "--read-endless"
+            },
+            description = "Whether read endless or not, default 1/true, set to 0/false to stats ")
+        public int readEndless = 1;
     }
 
     protected final Flags flags;
@@ -273,7 +287,7 @@ public class CStreamReader extends ReaderBase {
         ReadEvents<Integer, GenericRecord> readEvents;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
-                readEvents = readers.get(i).readNext(100, TimeUnit.MILLISECONDS);
+                readEvents = readers.get(i).readNext(flags.pollTimeoutMs, TimeUnit.MILLISECONDS);
                 if (null != readEvents) {
                     final long receiveTime = System.currentTimeMillis();
                     eventsRead.add(readEvents.numEvents());
@@ -297,6 +311,9 @@ public class CStreamReader extends ReaderBase {
                                 readEvent.position(), readEvent.timestamp());
                         }
                     }
+                } else if (flags.readEndless == 0) {
+                    log.info("No more data after {} ms, shut down", flags.pollTimeoutMs);
+                    System.exit(-1);
                 }
             }
         }
@@ -336,7 +353,7 @@ public class CStreamReader extends ReaderBase {
                 columnVectors = columnVectorsList.get(i);
                 if (null != columnVectors) {
                     if (columnVectors.hasNext()) {
-                        ColumnVector columnVector = columnVectors.next(100, TimeUnit.MILLISECONDS);
+                        ColumnVector columnVector = columnVectors.next(flags.pollTimeoutMs, TimeUnit.MILLISECONDS);
                         if (null != columnVector) {
                             cumulativeEventsRead.add(columnVector.num());
                             cumulativeBytesRead.add(columnVector.estimatedSize());
@@ -346,6 +363,9 @@ public class CStreamReader extends ReaderBase {
                                 log.info("Column vector's stream is {}, end position is {} ",
                                     columnVector.stream(), columnVector.position());
                             }
+                        } else if (flags.readEndless == 0) {
+                            log.info("No more data after {} ms, shut down", flags.pollTimeoutMs);
+                            System.exit(-1);
                         }
                     }
                 }

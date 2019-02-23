@@ -14,6 +14,7 @@
 
 package me.jinsui.shennong.bench.reader;
 
+import static java.util.Collections.singleton;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -21,13 +22,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import me.jinsui.shennong.bench.utils.AvroDeserializer;
-import me.jinsui.shennong.bench.utils.AvroSerializer;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.tuple.Pair;
@@ -35,8 +36,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.LongDeserializer;
-import org.apache.kafka.common.serialization.LongSerializer;
 
 /**
  * A perf reader to evaluate read performance to Kafka.
@@ -104,6 +105,13 @@ public class KafkaReader extends ReaderBase {
             },
             description = "Timeout of consumer poll")
         public long pollTimeoutMs = 100;
+
+        @Parameter(
+            names = {
+                "-re", "--read-endless"
+            },
+            description = "Whether read endless or not, default 1/true, set to 0/false to stats ")
+        public int readEndless = 1;
 
     }
 
@@ -182,10 +190,22 @@ public class KafkaReader extends ReaderBase {
     private void read(List<KafkaConsumer> consumersInThisThread) {
         log.info("Read thread started with : topics = {},", consumersInThisThread);
 
+        // set consume position to head compulsively to avoid can't read from head again after read once
+        if (flags.consumePosition == 0) {
+            for (KafkaConsumer consumer : consumersInThisThread) {
+                for (TopicPartition topicPartition : (Set<TopicPartition>) consumer.assignment()) {
+                    consumer.seekToBeginning(singleton(topicPartition));
+                }
+            }
+        }
         String[] readFields = flags.readColumn.split(",");
         while (true) {
             for (KafkaConsumer consumer : consumersInThisThread) {
                 ConsumerRecords<Long, GenericRecord> records = consumer.poll(flags.pollTimeoutMs);
+                if (records.count() == 0 && flags.readEndless == 0) {
+                    log.info("No more data after {} ms, shut down", flags.pollTimeoutMs);
+                    System.exit(-1);
+                }
                 eventsRead.add(records.count());
                 cumulativeEventsRead.add(records.count());
                 // filter according to read column
