@@ -220,7 +220,7 @@ public class KafkaReader extends ReaderBase {
                 ConsumerRecords<Long, GenericRecord> records = consumer.poll(flags.pollTimeoutMs);
                 if (records.count() == 0 && flags.readEndless == 0) {
                     if (backoffNum > flags.maxBackoffNum) {
-                        log.info("No more data after {} ms, shut down", flags.pollTimeoutMs);
+                        log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
                         System.exit(-1);
                     } else {
                         backoffNum++;

@@ -355,6 +355,7 @@ public class CStreamReader extends ReaderBase {
 
         final int numLogs = streams.size();
         ColumnVectors<Integer, GenericRecord> columnVectors;
+        int backoffNum = 0;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
                 columnVectors = columnVectorsList.get(i);
@@ -371,8 +372,12 @@ public class CStreamReader extends ReaderBase {
                                     columnVector.stream(), columnVector.position());
                             }
                         } else if (flags.readEndless == 0) {
-                            log.info("No more data after {} ms, shut down", flags.pollTimeoutMs);
-                            System.exit(-1);
+                            if (backoffNum > flags.maxBackoffNum) {
+                                log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                                System.exit(-1);
+                            } else {
+                                backoffNum++;
+                            }
                         }
                     }
                 }
