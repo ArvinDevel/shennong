@@ -226,11 +226,6 @@ public class KafkaWriter extends WriterBase {
         long totalBytesWritten = 0L;
         int eventSize = dataSource.getEventSize();
         final int numStream = streams.size();
-        // create topicNames pre to avoid redundant overhead
-        String[] topicNames = new String[numStream];
-        for (int i = 0; i < numStream; i++) {
-            topicNames[i] = String.format(flags.topicName, i);
-        }
         while (true) {
             for (int i = 0; i < numStream; i++) {
                 if (numRecordsForThisThread > 0
@@ -247,7 +242,7 @@ public class KafkaWriter extends WriterBase {
                     final long sendTime = System.nanoTime();
                     try {
                         if (flags.valueType > 0) {
-                            bytesProducer.send(new ProducerRecord<>(topicNames[i], System.currentTimeMillis(), payload),
+                            bytesProducer.send(new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), payload),
                                 (metadata, exception) -> {
                                     if (null != exception) {
                                         log.error("Write fail", exception);
@@ -268,7 +263,7 @@ public class KafkaWriter extends WriterBase {
                                 });
                         } else {
                             GenericRecord msg = dataSource.getNext();
-                            producer.send(new ProducerRecord<>(topicNames[i], System.currentTimeMillis(), msg),
+                            producer.send(new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), msg),
                                 (metadata, exception) -> {
                                     if (null != exception) {
                                         log.error("Write fail", exception);

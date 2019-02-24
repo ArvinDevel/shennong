@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +35,6 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.LongDeserializer;
 
 /**
@@ -118,7 +116,7 @@ public class KafkaReader extends ReaderBase {
                 "-mbn", "--max-backoff-num"
             },
             description = "Max backoff number")
-        public int maxBackoffNum = 100;
+        public int maxBackoffNum = -1;
 
     }
 
@@ -200,8 +198,10 @@ public class KafkaReader extends ReaderBase {
         // set consume position to head compulsively to avoid can't read from head again after read once
         if (flags.consumePosition == 0) {
             for (KafkaConsumer consumer : consumersInThisThread) {
-                consumer.seekToBeginning(consumer.assignment());
+                // to get assignment of the consumer
+                consumer.poll(flags.pollTimeoutMs);
                 log.info("consumer {} has partitions {} ", consumer, consumer.assignment());
+                consumer.seekToBeginning(consumer.assignment());
             }
         }
         String[] readFields = flags.readColumn.split(",");
