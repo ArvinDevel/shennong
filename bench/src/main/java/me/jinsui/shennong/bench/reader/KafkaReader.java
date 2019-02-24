@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +36,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.LongDeserializer;
 
 /**
@@ -59,8 +61,8 @@ public class KafkaReader extends ReaderBase {
             names = {
                 "-cp", "--consume-position"
             },
-            description = "Consume position, default 0 earliest, otherwise latest")
-        public int consumePosition = 0;
+            description = "Consume position, default 0 earliest, -1 latest, others means specified offset")
+        public long consumePosition = 0;
 
         @Parameter(
             names = {
@@ -196,12 +198,19 @@ public class KafkaReader extends ReaderBase {
         log.info("Read thread started with : topics = {},", consumersInThisThread);
 
         // set consume position to head compulsively to avoid can't read from head again after read once
-        if (flags.consumePosition == 0) {
+        if (flags.consumePosition != -1) {
             for (KafkaConsumer consumer : consumersInThisThread) {
                 // to get assignment of the consumer
                 consumer.poll(flags.pollTimeoutMs);
                 log.info("consumer {} has partitions {} ", consumer, consumer.assignment());
-                consumer.seekToBeginning(consumer.assignment());
+                // seek to head
+                if (flags.consumePosition == 0) {
+                    consumer.seekToBeginning(consumer.assignment());
+                } else {
+                    for (TopicPartition topicPartition : (Set<TopicPartition>) consumer.assignment()) {
+                        consumer.seek(topicPartition, flags.consumePosition);
+                    }
+                }
             }
         }
         String[] readFields = flags.readColumn.split(",");
