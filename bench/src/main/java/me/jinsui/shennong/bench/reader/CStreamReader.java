@@ -168,6 +168,13 @@ public class CStreamReader extends ReaderBase {
             },
             description = "Whether read endless or not, default 1/true, set to 0/false to stats ")
         public int readEndless = 1;
+
+        @Parameter(
+            names = {
+                "-mbn", "--max-backoff-num"
+            },
+            description = "Max backoff number")
+        public int maxBackoffNum = -1;
     }
 
     protected final Flags flags;
@@ -285,6 +292,7 @@ public class CStreamReader extends ReaderBase {
 
         final int numLogs = streams.size();
         ReadEvents<Integer, GenericRecord> readEvents;
+        int backoffNum = 0;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
                 readEvents = readers.get(i).readNext(flags.pollTimeoutMs, TimeUnit.MILLISECONDS);
@@ -305,15 +313,14 @@ public class CStreamReader extends ReaderBase {
                             log.error("receiveTime is {}, readEvent.timestamp() is {}",
                                 receiveTime, readEvent.timestamp());
                         }
-                        if (((EventPositionImpl) readEvent.position()).getRangeSeqNum() % 1000 == 0
-                            && ((EventPositionImpl) readEvent.position()).getSlotId() % 100 == 0) {
-                            log.info("Read event @ position {}, ts {}",
-                                readEvent.position(), readEvent.timestamp());
-                        }
                     }
                 } else if (flags.readEndless == 0) {
-                    log.info("No more data after {} ms, shut down", flags.pollTimeoutMs);
-                    System.exit(-1);
+                    if (backoffNum > flags.maxBackoffNum) {
+                        log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                        System.exit(-1);
+                    } else {
+                        backoffNum++;
+                    }
                 }
             }
         }
