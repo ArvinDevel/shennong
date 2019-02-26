@@ -1,0 +1,16 @@
+{
+  "namespace": "me.jinsui.shennong.bench.avro",
+  "type": "record",
+  "name": "Orders",
+  "fields": [
+    {"name": "orderkey", "type": "long"},
+    {"name": "custkey", "type": "long"},
+    {"name": "orderstatus", "type": "boolean"},
+    {"name": "totalprice", "type": "double"},
+    {"name": "orderdate", "type": "int", "logicalType": "date"},
+    {"name": "orderpriority", "type": "string"},
+    {"name": "clerk", "type": "string"},
+    {"name": "shippriority", "type": "int"},
+    {"name": "comment", "type": "string"}
+  ]
+}

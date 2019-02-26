@@ -5,6 +5,7 @@ import static org.apache.bookkeeper.stream.protocol.ProtocolConstants.DEFAULT_ST
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.google.protobuf.ByteString;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,13 +15,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.avro.Orders;
 import me.jinsui.shennong.bench.avro.User;
 import me.jinsui.shennong.bench.source.AvroDataSource;
 import me.jinsui.shennong.bench.source.DataSource;
+import me.jinsui.shennong.bench.source.TpchDataSourceFactory;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.bookkeeper.api.StorageClient;
 import org.apache.bookkeeper.api.schema.Schemas;
+import org.apache.bookkeeper.api.schema.TypedSchema;
 import org.apache.bookkeeper.api.stream.Stream;
 import org.apache.bookkeeper.api.stream.StreamConfig;
 import org.apache.bookkeeper.api.stream.StreamSchemaBuilder;
@@ -77,6 +81,20 @@ public class CStreamWriter extends WriterBase {
             },
             description = "Schema represented as Avro, used in complex mode")
         public String schemaFile = null;
+
+        @Parameter(
+            names = {
+                "-tn", "--table-name"
+            },
+            description = "Tpch table name, using tpch data when this specified.")
+        public String tableName = null;
+
+        @Parameter(
+            names = {
+                "-tsf", "--tpch-scale-factor"
+            },
+            description = "Tpch table generate data scale factor, default 1.")
+        public int scaleFactor = 1;
 
         @Parameter(
             names = {
@@ -161,7 +179,11 @@ public class CStreamWriter extends WriterBase {
     private final Flags flags;
 
     public CStreamWriter(Flags flags) {
-        this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
+        if (null != flags.tableName) {
+            this.dataSource = TpchDataSourceFactory.getTblDataSource(flags.writeRate, flags.tableName, flags.scaleFactor);
+        } else {
+            this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
+        }
         this.flags = flags;
     }
 
@@ -208,10 +230,24 @@ public class CStreamWriter extends WriterBase {
                 .build())
             .withNamespace(flags.namespaceName)
             .build()) {
+            TypedSchema<GenericRecord> valueTypedSchema;
+            if (null != flags.tableName) {
+                switch (flags.tableName) {
+                    case "orders":
+                        valueTypedSchema = TypedSchemas.avroSchema(Orders.getClassSchema());
+                        break;
+                    default:
+                        valueTypedSchema = null;
+                        System.exit(-1);
+                        log.error("{} is Not standard tpch table", flags.tableName);
+                }
+            } else {
+                valueTypedSchema = TypedSchemas.avroSchema(User.getClassSchema());
+            }
             StreamConfig<Integer, GenericRecord> streamConfig = StreamConfig.<Integer, GenericRecord>builder()
                 .schema(StreamSchemaBuilder.<Integer, GenericRecord>builder()
                     .key(TypedSchemas.int32())
-                    .value(TypedSchemas.avroSchema(User.getClassSchema()))
+                    .value(valueTypedSchema)
                     .build())
                 .keyRouter(IntHashRouter.of())
                 .build();
@@ -343,12 +379,40 @@ public class CStreamWriter extends WriterBase {
                         System.exit(-1);
                         return null;
                     });
+                } else {
+                    if (null != flags.tableName) {
+                        switch (flags.tableName) {
+                            case "orders":
+                                if (!((TpchDataSourceFactory.OrdersDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    System.exit(0);
+                                }
+                                break;
+                            default:
+                                log.error("Shouldn't come to here!");
+                                System.exit(-1);
+                        }
+                    }
                 }
             }
         }
     }
 
     private StreamConfiguration newStreamConfiguration() {
+        ByteString schema;
+        if (null != flags.tableName) {
+            switch (flags.tableName) {
+                case "orders":
+                    schema = Schemas.serializeSchema(Orders.getClassSchema());
+                    break;
+                default:
+                    schema = null;
+                    System.exit(-1);
+                    log.error("{} is Not standard tpch table", flags.tableName);
+            }
+        } else {
+            schema = Schemas.serializeSchema(User.getClassSchema());
+        }
         StreamSchemaInfo streamSchemaInfo = StreamSchemaInfo.newBuilder()
             .setKeySchema(SchemaInfo.newBuilder()
                 .setSchemaType(SchemaType.INT32)
@@ -356,7 +420,7 @@ public class CStreamWriter extends WriterBase {
             .setValSchema(SchemaInfo.newBuilder()
                 .setSchemaType(SchemaType.STRUCT)
                 .setStructType(StructType.AVRO)
-                .setSchema(Schemas.serializeSchema(User.getClassSchema()))
+                .setSchema(schema)
                 .build())
             .build();
 

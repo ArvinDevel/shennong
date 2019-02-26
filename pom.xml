@@ -26,7 +26,7 @@
         <slf4j.version>1.7.25</slf4j.version>
         <junit.version>4.8.1</junit.version>
         <zookeeper.version>3.4.13</zookeeper.version>
-        <guava.version>21.0</guava.version>
+        <guava.version>22.0</guava.version>
         <slf4j.version>1.7.25</slf4j.version>
         <maven-antrun-plugin.version>1.8</maven-antrun-plugin.version>
         <maven-assembly-plugin.version>3.1.0</maven-assembly-plugin.version>

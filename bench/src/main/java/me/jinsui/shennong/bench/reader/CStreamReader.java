@@ -29,10 +29,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.avro.Orders;
 import me.jinsui.shennong.bench.avro.User;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.bookkeeper.api.StorageClient;
+import org.apache.bookkeeper.api.schema.TypedSchema;
 import org.apache.bookkeeper.api.stream.ColumnReader;
 import org.apache.bookkeeper.api.stream.ColumnReaderConfig;
 import org.apache.bookkeeper.api.stream.ColumnVector;
@@ -175,6 +177,13 @@ public class CStreamReader extends ReaderBase {
             },
             description = "Max backoff number")
         public int maxBackoffNum = -1;
+
+        @Parameter(
+            names = {
+                "-tn", "--table-name"
+            },
+            description = "Read data from Tpch table.")
+        public String tableName = null;
     }
 
     protected final Flags flags;
@@ -203,10 +212,24 @@ public class CStreamReader extends ReaderBase {
                 .build())
             .withNamespace(flags.namespaceName)
             .build()) {
+            TypedSchema<GenericRecord> valueTypedSchema;
+            if (null != flags.tableName) {
+                switch (flags.tableName) {
+                    case "orders":
+                        valueTypedSchema = TypedSchemas.avroSchema(Orders.getClassSchema());
+                        break;
+                    default:
+                        valueTypedSchema = null;
+                        System.exit(-1);
+                        log.error("{} is Not standard tpch table", flags.tableName);
+                }
+            } else {
+                valueTypedSchema = TypedSchemas.avroSchema(User.getClassSchema());
+            }
             StreamConfig<Integer, GenericRecord> streamConfig = StreamConfig.<Integer, GenericRecord>builder()
                 .schema(StreamSchemaBuilder.<Integer, GenericRecord>builder()
                     .key(TypedSchemas.int32())
-                    .value(TypedSchemas.avroSchema(User.getClassSchema()))
+                    .value(valueTypedSchema)
                     .build())
                 .keyRouter(IntHashRouter.of())
                 .build();
