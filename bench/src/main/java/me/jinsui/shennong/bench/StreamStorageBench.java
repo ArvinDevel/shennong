@@ -5,6 +5,7 @@ import java.util.Arrays;
 import lombok.extern.slf4j.Slf4j;
 import me.jinsui.shennong.bench.reader.CStreamReader;
 import me.jinsui.shennong.bench.reader.KafkaReader;
+import me.jinsui.shennong.bench.reader.HDFSReader;
 import me.jinsui.shennong.bench.writer.CStreamWriter;
 import me.jinsui.shennong.bench.writer.HDFSWriter;
 import me.jinsui.shennong.bench.writer.KafkaWriter;
@@ -121,6 +122,25 @@ public class StreamStorageBench {
                     commander.usage();
                 } else {
                     new KafkaReader(kafkaFlags).run();
+                }
+            } else if (args[1].equals("hdfs")) {
+                HDFSReader.Flags parquetFlags = new HDFSReader.Flags();
+                commander = JCommander.newBuilder()
+                    .addObject(parquetFlags)
+                    .build();
+                String[] subCmdArgs = Arrays.copyOfRange(
+                    args, 2, args.length);
+                try {
+                    commander.parse(subCmdArgs);
+                } catch (Exception e) {
+                    log.warn("Parse exception ", e);
+                    commander.usage();
+                    return;
+                }
+                if (parquetFlags.help) {
+                    commander.usage();
+                } else {
+                    new HDFSReader(parquetFlags).run();
                 }
             } else {
                 log.warn("Currently not implemented");

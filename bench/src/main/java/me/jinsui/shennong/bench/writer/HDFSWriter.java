@@ -10,10 +10,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.avro.Orders;
 import me.jinsui.shennong.bench.avro.User;
 import me.jinsui.shennong.bench.source.AvroDataSource;
 import me.jinsui.shennong.bench.source.DataSource;
+import me.jinsui.shennong.bench.source.TpchDataSourceFactory;
 import me.jinsui.shennong.bench.utils.CliFlags;
+import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -119,13 +122,31 @@ public class HDFSWriter extends WriterBase {
             description = "Number of bytes to write in total. If 0, it will keep writing")
         public long numBytes = 0;
 
+        @Parameter(
+            names = {
+                "-tn", "--table-name"
+            },
+            description = "Tpch table name, using tpch data source when this specified.")
+        public String tableName = null;
+
+        @Parameter(
+            names = {
+                "-tsf", "--tpch-scale-factor"
+            },
+            description = "Tpch table generate data scale factor, default 1.")
+        public int scaleFactor = 1;
+
     }
 
     private final Flags flags;
     private final DataSource<GenericRecord> dataSource;
 
     public HDFSWriter(Flags flags) {
-        this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
+        if (null != flags.tableName) {
+            this.dataSource = TpchDataSourceFactory.getTblDataSource(flags.writeRate, flags.tableName, flags.scaleFactor);
+        } else {
+            this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
+        }
         this.flags = flags;
     }
 
@@ -133,7 +154,7 @@ public class HDFSWriter extends WriterBase {
     void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
         ObjectWriter w = m.writerWithDefaultPrettyPrinter();
-        log.info("Starting kafka writer with config : {}", w.writeValueAsString(flags));
+        log.info("Starting parquet writer over HDFS with config : {}", w.writeValueAsString(flags));
         // create dfs
         Configuration configuration = new Configuration();
         configuration.set("fs.default.name", flags.url);
@@ -144,13 +165,27 @@ public class HDFSWriter extends WriterBase {
             if (!dfs.exists(path)) {
                 dfs.create(path, flags.replicaSize);
             }
+            Schema writerSchema;
+            if (null != flags.tableName) {
+                switch (flags.tableName) {
+                    case "orders":
+                        writerSchema = Orders.getClassSchema();
+                        break;
+                    default:
+                        writerSchema = null;
+                        System.exit(-1);
+                        log.error("{} is Not standard tpch table", flags.tableName);
+                }
+            } else {
+                writerSchema = User.getClassSchema();
+            }
             ParquetWriter<GenericRecord> writer = null;
             writer = AvroParquetWriter.
                 <GenericRecord>builder(path)
                 .withRowGroupSize(flags.blockSize)
                 .withPageSize(flags.pageSize)
                 .withWriteMode(ParquetFileWriter.Mode.OVERWRITE)
-                .withSchema(User.getClassSchema())
+                .withSchema(writerSchema)
                 .withConf(dfs.getConf())
                 .withCompressionCodec(CompressionCodecName.UNCOMPRESSED)
                 .withValidation(false)
@@ -237,13 +272,7 @@ public class HDFSWriter extends WriterBase {
                 if (dataSource.hasNext()) {
                     GenericRecord msg = dataSource.getNext();
                     final long sendTime = System.nanoTime();
-                    if(totalWritten % 100000 == 0) {
-                        log.info("before write msg");
-                        writers.get(i).write(msg);
-                        log.info("after write msg");
-                    } else {
-                        writers.get(i).write(msg);
-                    }
+                    writers.get(i).write(msg);
 
                     long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                         System.nanoTime() - sendTime
@@ -257,6 +286,21 @@ public class HDFSWriter extends WriterBase {
                     // accumulated stats is more suitable for file scenario
                     cumulativeEventsWritten.increment();
                     cumulativeBytesWritten.add(eventSize);
+                } else {
+                    if (null != flags.tableName) {
+                        // as tpch factor restricted total data, so terminate program
+                        switch (flags.tableName) {
+                            case "orders":
+                                if (!((TpchDataSourceFactory.OrdersDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();                                }
+                                break;
+                            default:
+                                log.error("Shouldn't come to here!");
+                                System.exit(-1);
+                        }
+                    }
                 }
             }
         }

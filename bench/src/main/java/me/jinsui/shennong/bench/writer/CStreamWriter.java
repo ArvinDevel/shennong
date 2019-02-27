@@ -385,7 +385,7 @@ public class CStreamWriter extends WriterBase {
                             case "orders":
                                 if (!((TpchDataSourceFactory.OrdersDataSource) dataSource).getIterator().hasNext()) {
                                     log.info("Generated orders Tale data were finished, existing...");
-                                    System.exit(0);
+                                    markPerfDone();
                                 }
                                 break;
                             default:
