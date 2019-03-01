@@ -1,0 +1,16 @@
+{
+  "namespace": "me.jinsui.shennong.bench.avro",
+  "type": "record",
+  "name": "Part",
+  "fields": [
+    {"name": "partkey", "type": "long"},
+    {"name": "name", "type": "string"},
+    {"name": "mfgr", "type": "string"},
+    {"name": "brand", "type": "string"},
+    {"name": "type", "type": "string"},
+    {"name": "size", "type": "int"},
+    {"name": "container", "type": "string"},
+    {"name": "retailprice", "type": "double"},
+    {"name": "comment", "type": "string"}
+  ]
+}

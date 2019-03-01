@@ -1,0 +1,15 @@
+{
+  "namespace": "me.jinsui.shennong.bench.avro",
+  "type": "record",
+  "name": "Customer",
+  "fields": [
+    {"name": "custkey", "type": "long"},
+    {"name": "name", "type": "string"},
+    {"name": "address", "type": "string"},
+    {"name": "nationkey", "type": "long"},
+    {"name": "phone", "type": "string"},
+    {"name": "acctbal", "type": "double"},
+    {"name": "mktsegment", "type": "string"},
+    {"name": "comment", "type": "string"}
+  ]
+}

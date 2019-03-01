@@ -1,0 +1,12 @@
+{
+  "namespace": "me.jinsui.shennong.bench.avro",
+  "type": "record",
+  "name": "Partsupp",
+  "fields": [
+    {"name": "partkey", "type": "long"},
+    {"name": "suppkey", "type": "long"},
+    {"name": "availqty", "type": "int"},
+    {"name": "supplycost", "type": "double"},
+    {"name": "comment", "type": "string"}
+  ]
+}

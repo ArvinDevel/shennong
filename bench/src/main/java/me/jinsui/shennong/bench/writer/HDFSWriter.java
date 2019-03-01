@@ -10,7 +10,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.avro.Customer;
+import me.jinsui.shennong.bench.avro.Lineitem;
 import me.jinsui.shennong.bench.avro.Orders;
+import me.jinsui.shennong.bench.avro.Part;
+import me.jinsui.shennong.bench.avro.Partsupp;
+import me.jinsui.shennong.bench.avro.Supplier;
 import me.jinsui.shennong.bench.avro.User;
 import me.jinsui.shennong.bench.source.AvroDataSource;
 import me.jinsui.shennong.bench.source.DataSource;
@@ -171,6 +176,21 @@ public class HDFSWriter extends WriterBase {
                     case "orders":
                         writerSchema = Orders.getClassSchema();
                         break;
+                    case "lineitem":
+                        writerSchema = Lineitem.getClassSchema();
+                        break;
+                    case "customer":
+                        writerSchema = Customer.getClassSchema();
+                        break;
+                    case "part":
+                        writerSchema = Part.getClassSchema();
+                        break;
+                    case "partsupp":
+                        writerSchema = Partsupp.getClassSchema();
+                        break;
+                    case "supplier":
+                        writerSchema = Supplier.getClassSchema();
+                        break;
                     default:
                         writerSchema = null;
                         System.exit(-1);
@@ -294,7 +314,43 @@ public class HDFSWriter extends WriterBase {
                                 if (!((TpchDataSourceFactory.OrdersDataSource) dataSource).getIterator().hasNext()) {
                                     log.info("Generated orders Tale data were finished, existing...");
                                     writers.get(i).close();
-                                    markPerfDone();                                }
+                                    markPerfDone();
+                                }
+                                break;
+                            case "lineitem":
+                                if (!((TpchDataSourceFactory.LineitemDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            case "customer":
+                                if (!((TpchDataSourceFactory.CustomerDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            case "part":
+                                if (!((TpchDataSourceFactory.PartDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            case "partsupp":
+                                if (!((TpchDataSourceFactory.PartsuppDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            case "supplier":
+                                if (!((TpchDataSourceFactory.SupplierDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
                                 break;
                             default:
                                 log.error("Shouldn't come to here!");

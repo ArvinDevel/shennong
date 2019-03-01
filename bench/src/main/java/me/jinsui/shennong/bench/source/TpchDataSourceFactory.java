@@ -1,12 +1,24 @@
 package me.jinsui.shennong.bench.source;
 
 import com.google.common.util.concurrent.RateLimiter;
+import io.airlift.tpch.Customer;
+import io.airlift.tpch.CustomerGenerator;
+import io.airlift.tpch.LineItem;
+import io.airlift.tpch.LineItemGenerator;
 import io.airlift.tpch.Order;
 import io.airlift.tpch.OrderGenerator;
+import io.airlift.tpch.Part;
+import io.airlift.tpch.PartGenerator;
+import io.airlift.tpch.PartSupplier;
+import io.airlift.tpch.PartSupplierGenerator;
+import io.airlift.tpch.Supplier;
+import io.airlift.tpch.SupplierGenerator;
 import java.util.Iterator;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.avro.Lineitem;
 import me.jinsui.shennong.bench.avro.Orders;
+import me.jinsui.shennong.bench.avro.Partsupp;
 import org.apache.avro.generic.GenericRecord;
 
 /**
@@ -16,13 +28,68 @@ import org.apache.avro.generic.GenericRecord;
 public class TpchDataSourceFactory {
 
     public static DataSource<GenericRecord> getTblDataSource(double rate, String tbl, int scaleFactor) {
+        // arrange the table according to tbl size
         switch (tbl) {
+            case "lineitem":
+                return new LineitemDataSource(rate, scaleFactor);
             case "orders":
                 return new OrdersDataSource(rate, scaleFactor);
+            case "partsupp":
+                return new PartsuppDataSource(rate, scaleFactor);
+            case "customer":
+                return new CustomerDataSource(rate, scaleFactor);
+            case "part":
+                return new PartDataSource(rate, scaleFactor);
+            case "supplier":
+                return new SupplierDataSource(rate, scaleFactor);
             default:
                 log.error("Specified Wrong tpch table {} existing...", tbl);
                 System.exit(-1);
                 return null;
+        }
+    }
+
+    public static class LineitemDataSource implements DataSource<GenericRecord> {
+        @Getter
+        private Iterator<LineItem> iterator;
+        private final RateLimiter rateLimiter;
+        private int msgSize;
+
+        public LineitemDataSource(double rate, int scaleFactor) {
+            this.rateLimiter = RateLimiter.create(rate);
+            this.iterator = new LineItemGenerator(scaleFactor, 1, 1).iterator();
+            this.msgSize = 8 * 3 + 4 + 8 * 4 + 2 + 4 * 3 + 25 + 10 + 44 / 2;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return rateLimiter.tryAcquire(msgSize) && iterator.hasNext();
+        }
+
+        public GenericRecord getNext() {
+            LineItem lineitem = iterator.next();
+            return Lineitem.newBuilder()
+                .setOrderkey(lineitem.getOrderKey())
+                .setPartkey(lineitem.getPartKey())
+                .setSuppkey(lineitem.getSupplierKey())
+                .setQuantity(lineitem.getQuantity())
+                .setExtendedprice(lineitem.getExtendedPrice())
+                .setDiscount(lineitem.getDiscount())
+                .setTax(lineitem.getTax())
+                .setReturnflag(lineitem.getReturnFlag())
+                .setLinestatus(lineitem.getStatus())
+                .setShipdate(lineitem.getShipDate())
+                .setCommitdate(lineitem.getCommitDate())
+                .setReceiptdate(lineitem.getReceiptDate())
+                .setShipinstruct(lineitem.getShipInstructions())
+                .setShipmode(lineitem.getShipMode())
+                .setComment(lineitem.getComment())
+                .build();
+        }
+
+        @Override
+        public int getEventSize() {
+            return msgSize;
         }
     }
 
@@ -35,7 +102,7 @@ public class TpchDataSourceFactory {
         public OrdersDataSource(double rate, int scaleFactor) {
             this.rateLimiter = RateLimiter.create(rate);
             this.iterator = new OrderGenerator(scaleFactor, 1, 1).iterator();
-            this.msgSize = 8 + 8 + 1 + 8 + 4 + 15 + 15 + 4 + 79;
+            this.msgSize = 8 + 8 + 1 + 8 + 4 + 15 + 15 + 4 + 79 / 2;
         }
 
         @Override
@@ -55,6 +122,151 @@ public class TpchDataSourceFactory {
                 .setClerk(order.getClerk())
                 .setShippriority(order.getShipPriority())
                 .setComment(order.getComment())
+                .build();
+        }
+
+        @Override
+        public int getEventSize() {
+            return msgSize;
+        }
+    }
+
+    public static class PartsuppDataSource implements DataSource<GenericRecord> {
+        @Getter
+        private Iterator<PartSupplier> iterator;
+        private final RateLimiter rateLimiter;
+        private int msgSize;
+
+        public PartsuppDataSource(double rate, int scaleFactor) {
+            this.rateLimiter = RateLimiter.create(rate);
+            this.iterator = new PartSupplierGenerator(scaleFactor, 1, 1).iterator();
+            this.msgSize = 8 * 2 + 8 + 199 / 2;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return rateLimiter.tryAcquire(msgSize) && iterator.hasNext();
+        }
+
+        public GenericRecord getNext() {
+            PartSupplier partSupplier = iterator.next();
+            return Partsupp.newBuilder()
+                .setPartkey(partSupplier.getPartKey())
+                .setSuppkey(partSupplier.getSupplierKey())
+                .setAvailqty(partSupplier.getAvailableQuantity())
+                .setSupplycost(partSupplier.getSupplyCost())
+                .setComment(partSupplier.getComment())
+                .build();
+        }
+
+        @Override
+        public int getEventSize() {
+            return msgSize;
+        }
+    }
+
+    public static class CustomerDataSource implements DataSource<GenericRecord> {
+        @Getter
+        private Iterator<Customer> iterator;
+        private final RateLimiter rateLimiter;
+        private int msgSize;
+
+        public CustomerDataSource(double rate, int scaleFactor) {
+            this.rateLimiter = RateLimiter.create(rate);
+            this.iterator = new CustomerGenerator(scaleFactor, 1, 1).iterator();
+            this.msgSize = 8 + 25 / 2 + 40 / 2 + 8 + 15 + 8 + 10 + 117 / 2;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return rateLimiter.tryAcquire(msgSize) && iterator.hasNext();
+        }
+
+        public GenericRecord getNext() {
+            Customer customer = iterator.next();
+            return me.jinsui.shennong.bench.avro.Customer.newBuilder()
+                .setCustkey(customer.getCustomerKey())
+                .setName(customer.getName())
+                .setAddress(customer.getAddress())
+                .setNationkey(customer.getNationKey())
+                .setPhone(customer.getPhone())
+                .setAcctbal(customer.getAccountBalance())
+                .setMktsegment(customer.getMarketSegment())
+                .setComment(customer.getComment())
+                .build();
+        }
+
+        @Override
+        public int getEventSize() {
+            return msgSize;
+        }
+    }
+
+    public static class PartDataSource implements DataSource<GenericRecord> {
+        @Getter
+        private Iterator<Part> iterator;
+        private final RateLimiter rateLimiter;
+        private int msgSize;
+
+        public PartDataSource(double rate, int scaleFactor) {
+            this.rateLimiter = RateLimiter.create(rate);
+            this.iterator = new PartGenerator(scaleFactor, 1, 1).iterator();
+            this.msgSize = 8 + 55 / 2 + 25 + 10 + 25 / 2 + 4 + 10 + 8 + 23 / 2;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return rateLimiter.tryAcquire(msgSize) && iterator.hasNext();
+        }
+
+        public GenericRecord getNext() {
+            Part part = iterator.next();
+            return me.jinsui.shennong.bench.avro.Part.newBuilder()
+                .setPartkey(part.getPartKey())
+                .setName(part.getName())
+                .setMfgr(part.getManufacturer())
+                .setBrand(part.getBrand())
+                .setType(part.getType())
+                .setSize(part.getSize())
+                .setContainer(part.getContainer())
+                .setRetailprice(part.getRetailPrice())
+                .setComment(part.getComment())
+                .build();
+        }
+
+        @Override
+        public int getEventSize() {
+            return msgSize;
+        }
+    }
+
+    public static class SupplierDataSource implements DataSource<GenericRecord> {
+        @Getter
+        private Iterator<Supplier> iterator;
+        private final RateLimiter rateLimiter;
+        private int msgSize;
+
+        public SupplierDataSource(double rate, int scaleFactor) {
+            this.rateLimiter = RateLimiter.create(rate);
+            this.iterator = new SupplierGenerator(scaleFactor, 1, 1).iterator();
+            this.msgSize = 8 + 25 + 40 / 2 + 8 + 15 + 8 + 101 / 2;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return rateLimiter.tryAcquire(msgSize) && iterator.hasNext();
+        }
+
+        public GenericRecord getNext() {
+            Supplier supplier = iterator.next();
+            return me.jinsui.shennong.bench.avro.Supplier.newBuilder()
+                .setSuppkey(supplier.getSupplierKey())
+                .setName(supplier.getName())
+                .setAddress(supplier.getAddress())
+                .setNationkey(supplier.getNationKey())
+                .setPhone(supplier.getPhone())
+                .setAcctbal(supplier.getAccountBalance())
+                .setComment(supplier.getComment())
                 .build();
         }
 

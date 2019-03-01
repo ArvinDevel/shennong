@@ -1,0 +1,23 @@
+{
+  "namespace": "me.jinsui.shennong.bench.avro",
+  "type": "record",
+  "name": "Lineitem",
+  "fields": [
+    {"name": "orderkey", "type": "long"},
+    {"name": "partkey", "type": "long"},
+    {"name": "suppkey", "type": "long"},
+    {"name": "linenumber", "type": "int"},
+    {"name": "quantity", "type": "double"},
+    {"name": "extendedprice", "type": "double"},
+    {"name": "discount", "type": "double"},
+    {"name": "tax", "type": "double"},
+    {"name": "returnflag", "type": "string"},
+    {"name": "linestatus", "type": "string"},
+    {"name": "shipdate", "type": "int", "logicalType": "date"},
+    {"name": "commitdate", "type": "int", "logicalType": "date"},
+    {"name": "receiptdate", "type": "int", "logicalType": "date"},
+    {"name": "shipinstruct", "type": "string"},
+    {"name": "shipmode", "type": "string"},
+    {"name": "comment", "type": "string"}
+  ]
+}

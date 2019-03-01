@@ -1,0 +1,14 @@
+{
+  "namespace": "me.jinsui.shennong.bench.avro",
+  "type": "record",
+  "name": "Supplier",
+  "fields": [
+    {"name": "suppkey", "type": "long"},
+    {"name": "name", "type": "string"},
+    {"name": "address", "type": "string"},
+    {"name": "nationkey", "type": "long"},
+    {"name": "phone", "type": "string"},
+    {"name": "acctbal", "type": "double"},
+    {"name": "comment", "type": "string"}
+  ]
+}

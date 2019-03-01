@@ -25,7 +25,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.avro.Customer;
+import me.jinsui.shennong.bench.avro.Lineitem;
 import me.jinsui.shennong.bench.avro.Orders;
+import me.jinsui.shennong.bench.avro.Part;
+import me.jinsui.shennong.bench.avro.Partsupp;
+import me.jinsui.shennong.bench.avro.Supplier;
 import me.jinsui.shennong.bench.avro.User;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.Schema;
@@ -86,12 +91,6 @@ public class HDFSReader extends ReaderBase {
             description = "File name")
         public String fileName = "test-file-%06d";
 
-        @Parameter(
-            names = {
-                "-sn", "--stream-name"
-            },
-            description = "Stream name or stream name pattern if more than 1 stream is specified at `--num-streams`")
-        public String streamName = "test-stream-%06d";
 
         @Parameter(
             names = {
@@ -175,6 +174,21 @@ public class HDFSReader extends ReaderBase {
                 switch (flags.tableName) {
                     case "orders":
                         writeSchema = Orders.getClassSchema();
+                        break;
+                    case "lineitem":
+                        writeSchema = Lineitem.getClassSchema();
+                        break;
+                    case "customer":
+                        writeSchema = Customer.getClassSchema();
+                        break;
+                    case "part":
+                        writeSchema = Part.getClassSchema();
+                        break;
+                    case "partsupp":
+                        writeSchema = Partsupp.getClassSchema();
+                        break;
+                    case "supplier":
+                        writeSchema = Supplier.getClassSchema();
                         break;
                 }
             }

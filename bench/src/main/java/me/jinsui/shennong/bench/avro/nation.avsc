@@ -1,0 +1,11 @@
+{
+  "namespace": "me.jinsui.shennong.bench.avro",
+  "type": "record",
+  "name": "Nation",
+  "fields": [
+    {"name": "nationkey", "type": "long"},
+    {"name": "name", "type": "string"},
+    {"name": "regionkey", "type": "long"},
+    {"name": "comment", "type": "string"}
+  ]
+}

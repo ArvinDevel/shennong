@@ -15,7 +15,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.avro.Customer;
+import me.jinsui.shennong.bench.avro.Lineitem;
 import me.jinsui.shennong.bench.avro.Orders;
+import me.jinsui.shennong.bench.avro.Part;
+import me.jinsui.shennong.bench.avro.Partsupp;
+import me.jinsui.shennong.bench.avro.Supplier;
 import me.jinsui.shennong.bench.avro.User;
 import me.jinsui.shennong.bench.source.AvroDataSource;
 import me.jinsui.shennong.bench.source.DataSource;
@@ -236,6 +241,21 @@ public class CStreamWriter extends WriterBase {
                     case "orders":
                         valueTypedSchema = TypedSchemas.avroSchema(Orders.getClassSchema());
                         break;
+                    case "customer":
+                        valueTypedSchema = TypedSchemas.avroSchema(Customer.getClassSchema());
+                        break;
+                    case "lineitem":
+                        valueTypedSchema = TypedSchemas.avroSchema(Lineitem.getClassSchema());
+                        break;
+                    case "part":
+                        valueTypedSchema = TypedSchemas.avroSchema(Part.getClassSchema());
+                        break;
+                    case "partsupp":
+                        valueTypedSchema = TypedSchemas.avroSchema(Partsupp.getClassSchema());
+                        break;
+                    case "supplier":
+                        valueTypedSchema = TypedSchemas.avroSchema(Supplier.getClassSchema());
+                        break;
                     default:
                         valueTypedSchema = null;
                         System.exit(-1);
@@ -388,6 +408,36 @@ public class CStreamWriter extends WriterBase {
                                     markPerfDone();
                                 }
                                 break;
+                            case "customer":
+                                if (!((TpchDataSourceFactory.CustomerDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "lineitem":
+                                if (!((TpchDataSourceFactory.LineitemDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "part":
+                                if (!((TpchDataSourceFactory.PartDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "partsupp":
+                                if (!((TpchDataSourceFactory.PartsuppDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "supplier":
+                                if (!((TpchDataSourceFactory.SupplierDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
                             default:
                                 log.error("Shouldn't come to here!");
                                 System.exit(-1);
@@ -404,6 +454,21 @@ public class CStreamWriter extends WriterBase {
             switch (flags.tableName) {
                 case "orders":
                     schema = Schemas.serializeSchema(Orders.getClassSchema());
+                    break;
+                case "customer":
+                    schema = Schemas.serializeSchema(Customer.getClassSchema());
+                    break;
+                case "lineitem":
+                    schema = Schemas.serializeSchema(Lineitem.getClassSchema());
+                    break;
+                case "part":
+                    schema = Schemas.serializeSchema(Part.getClassSchema());
+                    break;
+                case "partsupp":
+                    schema = Schemas.serializeSchema(Partsupp.getClassSchema());
+                    break;
+                case "supplier":
+                    schema = Schemas.serializeSchema(Supplier.getClassSchema());
                     break;
                 default:
                     schema = null;
