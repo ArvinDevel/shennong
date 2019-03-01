@@ -29,7 +29,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.avro.Customer;
+import me.jinsui.shennong.bench.avro.Lineitem;
 import me.jinsui.shennong.bench.avro.Orders;
+import me.jinsui.shennong.bench.avro.Part;
+import me.jinsui.shennong.bench.avro.Partsupp;
+import me.jinsui.shennong.bench.avro.Supplier;
 import me.jinsui.shennong.bench.avro.User;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.generic.GenericRecord;
@@ -217,6 +222,21 @@ public class CStreamReader extends ReaderBase {
                 switch (flags.tableName) {
                     case "orders":
                         valueTypedSchema = TypedSchemas.avroSchema(Orders.getClassSchema());
+                        break;
+                    case "customer":
+                        valueTypedSchema = TypedSchemas.avroSchema(Customer.getClassSchema());
+                        break;
+                    case "lineitem":
+                        valueTypedSchema = TypedSchemas.avroSchema(Lineitem.getClassSchema());
+                        break;
+                    case "part":
+                        valueTypedSchema = TypedSchemas.avroSchema(Part.getClassSchema());
+                        break;
+                    case "partsupp":
+                        valueTypedSchema = TypedSchemas.avroSchema(Partsupp.getClassSchema());
+                        break;
+                    case "supplier":
+                        valueTypedSchema = TypedSchemas.avroSchema(Supplier.getClassSchema());
                         break;
                     default:
                         valueTypedSchema = null;

@@ -72,6 +72,7 @@ public class TpchDataSourceFactory {
                 .setOrderkey(lineitem.getOrderKey())
                 .setPartkey(lineitem.getPartKey())
                 .setSuppkey(lineitem.getSupplierKey())
+                .setLinenumber(lineitem.getLineNumber())
                 .setQuantity(lineitem.getQuantity())
                 .setExtendedprice(lineitem.getExtendedPrice())
                 .setDiscount(lineitem.getDiscount())
