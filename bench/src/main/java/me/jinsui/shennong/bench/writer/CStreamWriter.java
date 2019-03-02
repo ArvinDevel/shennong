@@ -103,24 +103,24 @@ public class CStreamWriter extends WriterBase {
 
         @Parameter(
             names = {
-                "-mbs", "--max-bytes-size"
+                "-mbs", "--max-buffer-size"
             },
-            description = "Max bytes size in the event")
-        public int bytesSize = 8;
+            description = "Max buffer size in the event set writer, preAllocated max buffer size")
+        public int bufferSize = 512 * 1024;
 
         @Parameter(
             names = {
                 "-men", "--max-event-num"
             },
             description = "Max event num in event set (require % 8 == 0)")
-        public int maxEventNum = 256;
+        public int maxEventNum = 8192;
 
         @Parameter(
             names = {
                 "-fdms", "--flush-duration-ms"
             },
-            description = "Generating event set duration")
-        public int flushDurationMs = 1;
+            description = "Generating event set duration, default 0: disable flush.")
+        public int flushDurationMs = 0;
 
         @Parameter(
             names = {
@@ -340,6 +340,8 @@ public class CStreamWriter extends WriterBase {
                long numRecordsForThisThread,
                long numBytesForThisThread) throws Exception {
         WriterConfig writerConfig = WriterConfig.builder()
+            .maxBufferSize(flags.bufferSize)
+            .maxBufferedEvents(flags.maxEventNum)
             .flushDuration(Duration.ofMillis(flags.flushDurationMs)).build();
         List<CompletableFuture<Writer<Integer, GenericRecord>>> writerFutures = streams.stream()
             .map(stream -> stream.openWriter(writerConfig))
