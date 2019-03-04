@@ -87,9 +87,18 @@ public class CStreamReader extends ReaderBase {
             names = {
                 "-m", "--read-mode"
             },
-            description = "Read mode, 0 indicate stream read, 1 indicate column stream read, default 0"
+            description = "Read mode, 0 indicate stream read,"
+                + " 1 indicate column stream read, 2 indicates random column read,default 0"
         )
         public int readMode = 0;
+
+        @Parameter(
+            names = {
+                "-rs", "--random-stripe"
+            },
+            description = "Random read stripe, first start from head, then stop it and read from 0 + rs position"
+        )
+        public int readStripe = 0;
 
         @Parameter(
             names = {
@@ -268,7 +277,7 @@ public class CStreamReader extends ReaderBase {
                     return;
                 }
             }
-            if (0 == flags.readMode || 1 == flags.readMode) {
+            if (0 == flags.readMode || 1 == flags.readMode || 2 == flags.readMode) {
                 log.info("Successfully open streams, and begin read from them");
                 execute(streams, flags.readMode);
             } else {
@@ -303,6 +312,8 @@ public class CStreamReader extends ReaderBase {
                             read(logsThisThread);
                         } else if (1 == mode) {
                             readColumn(logsThisThread);
+                        } else if (2 == mode) {
+                            randomReadColumn(logsThisThread, Position.HEAD);
                         }
                     } catch (Exception e) {
                         log.error("Encountered error at reading records", e);
@@ -410,10 +421,8 @@ public class CStreamReader extends ReaderBase {
                             cumulativeBytesRead.add(columnVector.estimatedSize());
                             eventsRead.add(columnVector.num());
                             bytesRead.add(columnVector.estimatedSize());
-                            if (((EventPositionImpl) columnVector.position()).getRangeSeqNum() % 1000 == 0) {
-                                log.info("Column vector's stream is {}, end position is {} ",
-                                    columnVector.stream(), columnVector.position());
-                            }
+                            log.info("Column vector's stream is {}, end position is {} cnt is {}",
+                                columnVector.stream(), columnVector.position(), columnVector.num());
                         } else if (flags.readEndless == 0) {
                             if (backoffNum > flags.maxBackoffNum) {
                                 log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
@@ -427,4 +436,79 @@ public class CStreamReader extends ReaderBase {
             }
         }
     }
+
+    void randomReadColumn(List<Stream<Integer, GenericRecord>> streams, Position startPosition) throws Exception {
+        ArrayList<String> list = new ArrayList<String>(Arrays.asList(flags.readColumn.split(",")));
+        log.info("Columns to be read is:");
+        for (String column : list) {
+            log.info("{}", column);
+        }
+        ColumnReaderConfig readerConfig = ColumnReaderConfig.builder()
+            .columns(list)
+            .maxReadAheadCacheSize(flags.readAheadCatchSize).build();
+        List<CompletableFuture<ColumnReader<Integer, GenericRecord>>> readerFutures = streams.stream()
+            .map(stream -> stream.openColumnReader(readerConfig, startPosition, Position.TAIL))
+            .collect(Collectors.toList());
+        List<ColumnVectors<Integer, GenericRecord>> columnVectorsList;
+        columnVectorsList = result(FutureUtils.collect(readerFutures)).stream()
+            .map(columnReader -> {
+                    try {
+                        return columnReader.readNextVector();
+                    } catch (StreamApiException sae) {
+                        log.error("Read column vector fail ", sae);
+                        return null;
+                    }
+                }
+            ).collect(Collectors.toList());
+
+        log.info("Read new part of stream from {}: logs = {}", startPosition,
+            streams.stream().map(stream -> stream.toString()).collect(Collectors.toList()));
+
+        final int numLogs = streams.size();
+        ColumnVectors<Integer, GenericRecord> columnVectors;
+        int backoffNum = 0;
+        int partialCumulative = 0;
+        Position nextPosition = null;
+        boolean partialFinished = false;
+        while (true) {
+            for (int i = 0; i < numLogs; i++) {
+                columnVectors = columnVectorsList.get(i);
+                if (null != columnVectors) {
+                    if (columnVectors.hasNext()) {
+                        ColumnVector columnVector = columnVectors.next(flags.pollTimeoutMs, TimeUnit.MILLISECONDS);
+                        if (null != columnVector) {
+                            partialCumulative += columnVector.num();
+                            cumulativeEventsRead.add(columnVector.num());
+                            cumulativeBytesRead.add(columnVector.estimatedSize());
+                            eventsRead.add(columnVector.num());
+                            bytesRead.add(columnVector.estimatedSize());
+                            log.info("Column vector's stream is {}, end position is {} cnt is {}",
+                                columnVector.stream(), columnVector.position(), columnVector.num());
+
+                            if (partialCumulative > flags.readStripe) {
+                                nextPosition = columnVector.position();
+                                partialFinished = true;
+                                break;
+                            }
+                        } else if (flags.readEndless == 0) {
+                            if (backoffNum > flags.maxBackoffNum) {
+                                log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                                System.exit(-1);
+                            } else {
+                                backoffNum++;
+                            }
+                        }
+                    }
+                }
+            }
+            if (partialFinished) {
+                break;
+            }
+        }
+        if (partialFinished) {
+            log.info("begin read nxt part of stream from ", nextPosition);
+            randomReadColumn(streams, nextPosition);
+        }
+    }
+
 }
