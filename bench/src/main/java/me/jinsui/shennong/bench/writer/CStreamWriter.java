@@ -78,7 +78,7 @@ public class CStreamWriter extends WriterBase {
                 "-r", "--rate"
             },
             description = "Write rate bytes/s across log streams")
-        public int writeRate = 0;
+        public double writeRate = 0;
 
         @Parameter(
             names = {
@@ -295,7 +295,7 @@ public class CStreamWriter extends WriterBase {
         try {
             final long numRecordsForThisThread = flags.numEvents / flags.numThreads;
             final long numBytesForThisThread = flags.numBytes / flags.numThreads;
-            final double writeRateForThisThread = flags.writeRate / (double) flags.numThreads;
+            final double writeRateForThisThread = flags.writeRate / flags.numThreads;
             for (int i = 0; i < flags.numThreads; i++) {
                 final int idx = i;
                 final List<Stream<Integer, GenericRecord>> logsThisThread = streams
