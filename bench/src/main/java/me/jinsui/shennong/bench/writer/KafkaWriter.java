@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import me.jinsui.shennong.bench.source.AvroDataSource;
 import me.jinsui.shennong.bench.source.DataSource;
+import me.jinsui.shennong.bench.source.TpchDataSourceFactory;
 import me.jinsui.shennong.bench.utils.AvroSerializer;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.generic.GenericRecord;
@@ -106,16 +107,28 @@ public class KafkaWriter extends WriterBase {
             description = "Number of bytes to write in total. If 0, it will keep writing")
         public long numBytes = 0;
 
+        @Parameter(
+            names = {
+                "-ttn", "--tpch-table-name"
+            },
+            description = "Tpch table name, using tpch data when this specified.")
+        public String tableName = null;
+
+        @Parameter(
+            names = {
+                "-tsf", "--tpch-scale-factor"
+            },
+            description = "Tpch table generate data scale factor, default 1.")
+        public int scaleFactor = 1;
+
     }
 
     private final Flags flags;
-    private final DataSource<GenericRecord> dataSource;
     private final KafkaProducer<Long, byte[]> bytesProducer;
     private final byte[] payload;
 
 
     public KafkaWriter(Flags flags) {
-        this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
         this.flags = flags;
         if (flags.valueType > 0) {
             this.bytesProducer = new KafkaProducer<>(newBytesValueKafkaProperties(flags));
@@ -219,6 +232,12 @@ public class KafkaWriter extends WriterBase {
             streams.stream().map(l -> l).collect(Collectors.toList()),
             numRecordsForThisThread,
             numBytesForThisThread);
+        final DataSource<GenericRecord> dataSource;
+        if (null != flags.tableName) {
+            dataSource = TpchDataSourceFactory.getTblDataSource(flags.writeRate, flags.tableName, flags.scaleFactor);
+        } else {
+            dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
+        }
 
         // one thread use one dedicated producer to avoid shared resource contention
         KafkaProducer<Long, GenericRecord> producer = new KafkaProducer<>(newKafkaProperties(flags));
@@ -287,6 +306,50 @@ public class KafkaWriter extends WriterBase {
                         log.error("Serialize msg fail ", se);
                         isDone.set(true);
                         System.exit(-1);
+                    }
+                } else {
+                    if (null != flags.tableName) {
+                        switch (flags.tableName) {
+                            case "orders":
+                                if (!((TpchDataSourceFactory.OrdersDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "customer":
+                                if (!((TpchDataSourceFactory.CustomerDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "lineitem":
+                                if (!((TpchDataSourceFactory.LineitemDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "part":
+                                if (!((TpchDataSourceFactory.PartDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "partsupp":
+                                if (!((TpchDataSourceFactory.PartsuppDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "supplier":
+                                if (!((TpchDataSourceFactory.SupplierDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            default:
+                                log.error("Shouldn't come to here!");
+                                System.exit(-1);
+                        }
                     }
                 }
             }
