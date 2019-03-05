@@ -14,7 +14,6 @@
 
 package me.jinsui.shennong.bench.reader;
 
-import static java.util.Collections.singleton;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -195,7 +194,7 @@ public class KafkaReader extends ReaderBase {
     }
 
     private void read(List<KafkaConsumer> consumersInThisThread) {
-        log.info("Read thread started with : topics = {},", consumersInThisThread);
+        log.info("Read thread started with : topics = {}", consumersInThisThread);
 
         // set consume position to head compulsively to avoid can't read from head again after read once
         if (flags.consumePosition != -1) {
