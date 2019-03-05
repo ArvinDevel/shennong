@@ -144,14 +144,8 @@ public class HDFSWriter extends WriterBase {
     }
 
     private final Flags flags;
-    private final DataSource<GenericRecord> dataSource;
 
     public HDFSWriter(Flags flags) {
-        if (null != flags.tableName) {
-            this.dataSource = TpchDataSourceFactory.getTblDataSource(flags.writeRate, flags.tableName, flags.scaleFactor);
-        } else {
-            this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
-        }
         this.flags = flags;
     }
 
@@ -225,6 +219,9 @@ public class HDFSWriter extends WriterBase {
 
         ExecutorService executor = Executors.newFixedThreadPool(flags.numThreads);
         try {
+            final long numRecordsForThisThread = flags.numEvents / flags.numThreads;
+            final long numBytesForThisThread = flags.numBytes / flags.numThreads;
+            final double writeRateForThisThread = flags.writeRate / (double) flags.numThreads;
             for (int i = 0; i < flags.numThreads; i++) {
                 final int idx = i;
                 final List<ParquetWriter<GenericRecord>> writersThisThread = fileWriters
@@ -232,12 +229,11 @@ public class HDFSWriter extends WriterBase {
                     .filter(pair -> pair.getLeft() % flags.numThreads == idx)
                     .map(pair -> pair.getRight())
                     .collect(Collectors.toList());
-                final long numRecordsForThisThread = flags.numEvents / flags.numThreads;
-                final long numBytesForThisThread = flags.numBytes / flags.numThreads;
                 executor.submit(() -> {
                     try {
                         write(
                             writersThisThread,
+                            writeRateForThisThread,
                             numRecordsForThisThread,
                             numBytesForThisThread);
                     } catch (Exception e) {
@@ -261,8 +257,16 @@ public class HDFSWriter extends WriterBase {
     }
 
     private void write(List<ParquetWriter<GenericRecord>> writers,
+                       double writeRate,
                        long numRecordsForThisThread,
                        long numBytesForThisThread) throws Exception {
+
+        DataSource<GenericRecord> dataSource;
+        if (null != flags.tableName) {
+            dataSource = TpchDataSourceFactory.getTblDataSource(writeRate, flags.tableName, flags.scaleFactor);
+        } else {
+            dataSource = new AvroDataSource(writeRate, flags.schemaFile);
+        }
 
         log.info("Write thread started with : logs = {},"
                 + " num records = {}, num bytes = {}",

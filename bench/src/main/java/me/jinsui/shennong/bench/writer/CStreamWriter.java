@@ -180,15 +180,9 @@ public class CStreamWriter extends WriterBase {
 
     }
 
-    private final DataSource<GenericRecord> dataSource;
     private final Flags flags;
 
     public CStreamWriter(Flags flags) {
-        if (null != flags.tableName) {
-            this.dataSource = TpchDataSourceFactory.getTblDataSource(flags.writeRate, flags.tableName, flags.scaleFactor);
-        } else {
-            this.dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
-        }
         this.flags = flags;
     }
 
@@ -299,6 +293,9 @@ public class CStreamWriter extends WriterBase {
 
         ExecutorService executor = Executors.newFixedThreadPool(flags.numThreads);
         try {
+            final long numRecordsForThisThread = flags.numEvents / flags.numThreads;
+            final long numBytesForThisThread = flags.numBytes / flags.numThreads;
+            final double writeRateForThisThread = flags.writeRate / (double) flags.numThreads;
             for (int i = 0; i < flags.numThreads; i++) {
                 final int idx = i;
                 final List<Stream<Integer, GenericRecord>> logsThisThread = streams
@@ -306,9 +303,6 @@ public class CStreamWriter extends WriterBase {
                     .filter(pair -> pair.getLeft() % flags.numThreads == idx)
                     .map(pair -> pair.getRight())
                     .collect(Collectors.toList());
-                final long numRecordsForThisThread = flags.numEvents / flags.numThreads;
-                final long numBytesForThisThread = flags.numBytes / flags.numThreads;
-                final double writeRateForThisThread = flags.writeRate / (double) flags.numThreads;
                 executor.submit(() -> {
                     try {
                         write(
@@ -347,6 +341,13 @@ public class CStreamWriter extends WriterBase {
             .map(stream -> stream.openWriter(writerConfig))
             .collect(Collectors.toList());
         List<Writer<Integer, GenericRecord>> writers = result(FutureUtils.collect(writerFutures));
+
+        DataSource<GenericRecord> dataSource;
+        if (null != flags.tableName) {
+            dataSource = TpchDataSourceFactory.getTblDataSource(writeRate, flags.tableName, flags.scaleFactor);
+        } else {
+            dataSource = new AvroDataSource(writeRate, flags.schemaFile);
+        }
 
         log.info("Write thread started with : logs = {}, rate = {},"
                 + " num records = {}, num bytes = {}",
