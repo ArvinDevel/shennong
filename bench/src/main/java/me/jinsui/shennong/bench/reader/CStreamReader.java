@@ -357,6 +357,8 @@ public class CStreamReader extends ReaderBase {
                                 receiveTime, readEvent.timestamp());
                         }
                     }
+                    // reset backoffNum
+                    backoffNum = 0;
                 } else if (flags.readEndless == 0) {
                     if (backoffNum > flags.maxBackoffNum) {
                         log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
@@ -414,9 +416,11 @@ public class CStreamReader extends ReaderBase {
                                 log.info("Column vector's stream is {}, end position is {} ",
                                     columnVector.stream(), columnVector.position());
                             }
+                            // reset backoffNum
+                            backoffNum = 0;
                         } else if (flags.readEndless == 0) {
                             if (backoffNum > flags.maxBackoffNum) {
-                                log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                                log.info("No more data after continurous {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
                                 System.exit(-1);
                             } else {
                                 backoffNum++;

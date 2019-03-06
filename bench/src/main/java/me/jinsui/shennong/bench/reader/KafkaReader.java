@@ -224,7 +224,10 @@ public class KafkaReader extends ReaderBase {
                     } else {
                         backoffNum++;
                     }
+                    continue;
                 }
+                // reset backoffNum
+                backoffNum = 0;
                 eventsRead.add(records.count());
                 cumulativeEventsRead.add(records.count());
                 // filter according to read column

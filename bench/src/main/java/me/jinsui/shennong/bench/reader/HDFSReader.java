@@ -108,13 +108,6 @@ public class HDFSReader extends ReaderBase {
 
         @Parameter(
             names = {
-                "-pt", "--poll-timeout-ms"
-            },
-            description = "Timeout of consumer poll")
-        public long pollTimeoutMs = 100;
-
-        @Parameter(
-            names = {
                 "-re", "--read-endless"
             },
             description = "Whether read endless or not, default 1/true, set to 0/false to stats ")
@@ -285,9 +278,11 @@ public class HDFSReader extends ReaderBase {
                     // todo estimate read size
 //                    bytesRead.add(readData.getEstimatedSize());
 //                    cumulativeBytesRead.add(readEvents.getEstimatedSize());
+                    // reset backoffNum
+                    backoffNum = 0;
                 } else if (flags.readEndless == 0) {
                     if (backoffNum > flags.maxBackoffNum) {
-                        log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                        log.info("No more data after {} retry number, shut down", flags.maxBackoffNum);
                         System.exit(-1);
                     } else {
                         backoffNum++;
