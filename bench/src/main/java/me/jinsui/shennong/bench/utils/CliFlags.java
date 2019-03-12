@@ -37,4 +37,32 @@ public class CliFlags {
         description = "Display help information")
     public boolean help = false;
 
+    @Parameter(
+        names = {
+            "-n", "--num-events"
+        },
+        description = "Number of events to write in total. If 0, it will keep writing")
+    public long numEvents = 0;
+
+    @Parameter(
+        names = {
+            "-b", "--num-bytes"
+        },
+        description = "Number of bytes to write in total. If 0, it will keep writing")
+    public long numBytes = 0;
+
+    @Parameter(
+        names = {
+            "-r", "--rate"
+        },
+        description = "Write rate bytes/s across all streams/topics/files")
+    public double writeRate = 10000000;
+
+    @Parameter(
+        names = {
+            "-bypass", "--bypass-server"
+        },
+        description = "Bypass server to monitor bench performance. Default 0")
+    public long bypass = 0;
+
 }

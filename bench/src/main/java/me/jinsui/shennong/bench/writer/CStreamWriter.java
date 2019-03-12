@@ -75,13 +75,6 @@ public class CStreamWriter extends WriterBase {
 
         @Parameter(
             names = {
-                "-r", "--rate"
-            },
-            description = "Write rate bytes/s across log streams")
-        public double writeRate = 0;
-
-        @Parameter(
-            names = {
                 "-sf", "--schema-file"
             },
             description = "Schema represented as Avro, used in complex mode")
@@ -163,20 +156,6 @@ public class CStreamWriter extends WriterBase {
             },
             description = "Number of threads writing")
         public int numThreads = 1;
-
-        @Parameter(
-            names = {
-                "-n", "--num-events"
-            },
-            description = "Number of events to write in total. If 0, it will keep writing")
-        public long numEvents = 0;
-
-        @Parameter(
-            names = {
-                "-b", "--num-bytes"
-            },
-            description = "Number of bytes to write in total. If 0, it will keep writing")
-        public long numBytes = 0;
 
     }
 
@@ -377,15 +356,14 @@ public class CStreamWriter extends WriterBase {
                 totalWritten++;
                 totalBytesWritten += eventSize;
                 if (dataSource.hasNext()) {
-                    GenericRecord genericRecord = dataSource.getNext();
                     final long sendTime = System.nanoTime();
+                    GenericRecord genericRecord = dataSource.getNext();
                     WriteEventBuilder<Integer, GenericRecord> eventBuilder = writers.get(i).eventBuilder();
-                    CompletableFuture<WriteResult> eventFuture = writers.get(i).write(eventBuilder.withKey(key++)
-                        .withValue(genericRecord)
-                        .withTimestamp(System.currentTimeMillis())
-                        .build());
-                    eventFuture.thenAccept(writeResult -> {
-
+                    if (0 != flags.bypass) {
+                        eventBuilder.withKey(key++)
+                            .withValue(genericRecord)
+                            .withTimestamp(System.currentTimeMillis())
+                            .build();
                         eventsWritten.increment();
                         bytesWritten.add(eventSize);
                         cumulativeEventsWritten.increment();
@@ -396,12 +374,30 @@ public class CStreamWriter extends WriterBase {
                         );
                         recorder.recordValue(latencyMicros);
                         cumulativeRecorder.recordValue(latencyMicros);
-                    }).exceptionally(cause -> {
-                        log.warn("Error at writing records", cause);
-                        isDone.set(true);
-                        System.exit(-1);
-                        return null;
-                    });
+                    } else {
+                        CompletableFuture<WriteResult> eventFuture = writers.get(i).write(eventBuilder.withKey(key++)
+                            .withValue(genericRecord)
+                            .withTimestamp(System.currentTimeMillis())
+                            .build());
+                        eventFuture.thenAccept(writeResult -> {
+
+                            eventsWritten.increment();
+                            bytesWritten.add(eventSize);
+                            cumulativeEventsWritten.increment();
+                            cumulativeBytesWritten.add(eventSize);
+
+                            long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                System.nanoTime() - sendTime
+                            );
+                            recorder.recordValue(latencyMicros);
+                            cumulativeRecorder.recordValue(latencyMicros);
+                        }).exceptionally(cause -> {
+                            log.warn("Error at writing records", cause);
+                            isDone.set(true);
+                            System.exit(-1);
+                            return null;
+                        });
+                    }
                 } else {
                     if (null != flags.tableName) {
                         switch (flags.tableName) {

@@ -52,13 +52,6 @@ public class HDFSWriter extends WriterBase {
 
         @Parameter(
             names = {
-                "-r", "--rate"
-            },
-            description = "Write rate bytes/s across all file")
-        public double writeRate = 1000000;
-
-        @Parameter(
-            names = {
                 "-sf", "--schema-file"
             },
             description = "Schema represented as Avro, used in complex mode")
@@ -112,20 +105,6 @@ public class HDFSWriter extends WriterBase {
             },
             description = "Number of threads writing")
         public int numThreads = 1;
-
-        @Parameter(
-            names = {
-                "-n", "--num-events"
-            },
-            description = "Number of events to write in total. If 0, it will keep writing")
-        public long numEvents = 0;
-
-        @Parameter(
-            names = {
-                "-b", "--num-bytes"
-            },
-            description = "Number of bytes to write in total. If 0, it will keep writing")
-        public long numBytes = 0;
 
         @Parameter(
             names = {
@@ -294,10 +273,11 @@ public class HDFSWriter extends WriterBase {
                 totalWritten++;
                 totalBytesWritten += eventSize;
                 if (dataSource.hasNext()) {
-                    GenericRecord msg = dataSource.getNext();
                     final long sendTime = System.nanoTime();
-                    writers.get(i).write(msg);
-
+                    GenericRecord msg = dataSource.getNext();
+                    if (0 == flags.bypass) {
+                        writers.get(i).write(msg);
+                    }
                     long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                         System.nanoTime() - sendTime
                     );

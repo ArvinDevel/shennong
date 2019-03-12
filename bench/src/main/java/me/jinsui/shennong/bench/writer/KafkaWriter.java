@@ -60,13 +60,6 @@ public class KafkaWriter extends WriterBase {
 
         @Parameter(
             names = {
-                "-r", "--rate"
-            },
-            description = "Write rate bytes/s across all topic")
-        public double writeRate = 1000000;
-
-        @Parameter(
-            names = {
                 "-sf", "--schema-file"
             },
             description = "Schema represented as Avro, used in complex mode")
@@ -92,20 +85,6 @@ public class KafkaWriter extends WriterBase {
             },
             description = "Number of threads writing")
         public int numThreads = 1;
-
-        @Parameter(
-            names = {
-                "-n", "--num-events"
-            },
-            description = "Number of events to write in total. If 0, it will keep writing")
-        public long numEvents = 0;
-
-        @Parameter(
-            names = {
-                "-b", "--num-bytes"
-            },
-            description = "Number of bytes to write in total. If 0, it will keep writing")
-        public long numBytes = 0;
 
         @Parameter(
             names = {
@@ -261,46 +240,74 @@ public class KafkaWriter extends WriterBase {
                     final long sendTime = System.nanoTime();
                     try {
                         if (flags.valueType > 0) {
-                            bytesProducer.send(new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), payload),
-                                (metadata, exception) -> {
-                                    if (null != exception) {
-                                        log.error("Write fail", exception);
-                                        isDone.set(true);
-                                        System.exit(-1);
-                                    } else {
-                                        eventsWritten.increment();
-                                        bytesWritten.add(flags.valueSize);
-                                        cumulativeEventsWritten.increment();
-                                        cumulativeBytesWritten.add(flags.valueSize);
+                            if (0 != flags.bypass) {
+                                new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), payload);
+                                eventsWritten.increment();
+                                bytesWritten.add(flags.valueSize);
+                                cumulativeEventsWritten.increment();
+                                cumulativeBytesWritten.add(flags.valueSize);
 
-                                        long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
-                                            System.nanoTime() - sendTime
-                                        );
-                                        recorder.recordValue(latencyMicros);
-                                        cumulativeRecorder.recordValue(latencyMicros);
-                                    }
-                                });
+                                long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                    System.nanoTime() - sendTime
+                                );
+                                recorder.recordValue(latencyMicros);
+                                cumulativeRecorder.recordValue(latencyMicros);
+                            } else {
+                                bytesProducer.send(new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), payload),
+                                    (metadata, exception) -> {
+                                        if (null != exception) {
+                                            log.error("Write fail", exception);
+                                            isDone.set(true);
+                                            System.exit(-1);
+                                        } else {
+                                            eventsWritten.increment();
+                                            bytesWritten.add(flags.valueSize);
+                                            cumulativeEventsWritten.increment();
+                                            cumulativeBytesWritten.add(flags.valueSize);
+
+                                            long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                                System.nanoTime() - sendTime
+                                            );
+                                            recorder.recordValue(latencyMicros);
+                                            cumulativeRecorder.recordValue(latencyMicros);
+                                        }
+                                    });
+                            }
                         } else {
                             GenericRecord msg = dataSource.getNext();
-                            producer.send(new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), msg),
-                                (metadata, exception) -> {
-                                    if (null != exception) {
-                                        log.error("Write fail", exception);
-                                        isDone.set(true);
-                                        System.exit(-1);
-                                    } else {
-                                        eventsWritten.increment();
-                                        bytesWritten.add(eventSize);
-                                        cumulativeEventsWritten.increment();
-                                        cumulativeBytesWritten.add(eventSize);
+                            if (0 != flags.bypass) {
+                                new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), msg);
+                                eventsWritten.increment();
+                                bytesWritten.add(eventSize);
+                                cumulativeEventsWritten.increment();
+                                cumulativeBytesWritten.add(eventSize);
 
-                                        long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
-                                            System.nanoTime() - sendTime
-                                        );
-                                        recorder.recordValue(latencyMicros);
-                                        cumulativeRecorder.recordValue(latencyMicros);
-                                    }
-                                });
+                                long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                    System.nanoTime() - sendTime
+                                );
+                                recorder.recordValue(latencyMicros);
+                                cumulativeRecorder.recordValue(latencyMicros);
+                            } else {
+                                producer.send(new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), msg),
+                                    (metadata, exception) -> {
+                                        if (null != exception) {
+                                            log.error("Write fail", exception);
+                                            isDone.set(true);
+                                            System.exit(-1);
+                                        } else {
+                                            eventsWritten.increment();
+                                            bytesWritten.add(eventSize);
+                                            cumulativeEventsWritten.increment();
+                                            cumulativeBytesWritten.add(eventSize);
+
+                                            long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                                System.nanoTime() - sendTime
+                                            );
+                                            recorder.recordValue(latencyMicros);
+                                            cumulativeRecorder.recordValue(latencyMicros);
+                                        }
+                                    });
+                            }
                         }
                     } catch (final SerializationException se) {
                         log.error("Serialize msg fail ", se);
