@@ -154,7 +154,12 @@ public class KafkaWriter extends WriterBase {
 
         List<Pair<Integer, String>> streams = new ArrayList<>(flags.numTopics);
         for (int i = 0; i < flags.numTopics; i++) {
-            String topicName = String.format(flags.topicName, i);
+            String topicName;
+            if (-1 != flags.streamOrder) {
+                topicName = String.format(flags.topicName, flags.streamOrder);
+            } else {
+                topicName = String.format(flags.topicName, i);
+            }
             streams.add(Pair.of(i, topicName));
         }
         execute(streams);

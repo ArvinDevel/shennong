@@ -139,7 +139,13 @@ public class HDFSWriter extends WriterBase {
         FileSystem dfs = FileSystem.get(configuration);
         List<Pair<Integer, ParquetWriter<GenericRecord>>> streams = new ArrayList<>(flags.numFiles);
         for (int i = 0; i < flags.numFiles; i++) {
-            Path path = new Path(flags.directory + String.format(flags.fileName, i));
+            String fileName;
+            if (-1 != flags.streamOrder) {
+                fileName = String.format(flags.fileName, flags.streamOrder);
+            } else {
+                fileName = String.format(flags.fileName, i);
+            }
+            Path path = new Path(flags.directory + fileName);
             if (!dfs.exists(path)) {
                 dfs.create(path, flags.replicaSize);
             }

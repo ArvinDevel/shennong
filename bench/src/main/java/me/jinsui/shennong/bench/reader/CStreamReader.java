@@ -255,7 +255,12 @@ public class CStreamReader extends ReaderBase {
                 .build();
             List<Pair<Integer, Stream<Integer, GenericRecord>>> streams = new ArrayList<>(flags.numStreams);
             for (int i = 0; i < flags.numStreams; i++) {
-                String streamName = String.format(flags.streamName, i);
+                String streamName;
+                if (-1 != flags.streamOrder) {
+                    streamName = String.format(flags.streamName, flags.streamOrder);
+                } else {
+                    streamName = String.format(flags.streamName, i);
+                }
                 try {
                     Stream<Integer, GenericRecord> stream =
                         FutureUtils.result(storageClient.openStream(streamName, streamConfig));

@@ -155,7 +155,13 @@ public class HDFSReader extends ReaderBase {
         FileSystem dfs = FileSystem.get(configuration);
         List<Pair<Integer, ParquetReader<GenericRecord>>> streams = new ArrayList<>(flags.numFiles);
         for (int i = 0; i < flags.numFiles; i++) {
-            Path path = new Path(flags.directory + String.format(flags.fileName, i));
+            String fileName;
+            if (-1 != flags.streamOrder) {
+                fileName = String.format(flags.fileName, flags.streamOrder);
+            } else {
+                fileName = String.format(flags.fileName, i);
+            }
+            Path path = new Path(flags.directory + String.format(fileName, i));
             if (!dfs.exists(path)) {
                 log.error("The path {} doesn't exists, existing now", path);
                 System.exit(-1);

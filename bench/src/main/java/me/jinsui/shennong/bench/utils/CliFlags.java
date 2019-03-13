@@ -65,4 +65,12 @@ public class CliFlags {
         description = "Bypass server to monitor bench performance. Default 0")
     public long bypass = 0;
 
+    @Parameter(
+        names = {
+            "-so", "--stream-order"
+        },
+        description = "Write/Read one specific stream only, default -1 write/read all stream." +
+            " It's better used with -s/t/f =1 to read one stream and multiple bench process to produce/consume all streams.")
+    public int streamOrder = -1;
+
 }
