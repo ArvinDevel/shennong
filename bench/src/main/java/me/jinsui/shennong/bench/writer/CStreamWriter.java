@@ -6,6 +6,7 @@ import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.protobuf.ByteString;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +46,7 @@ import org.apache.bookkeeper.clients.exceptions.NamespaceExistsException;
 import org.apache.bookkeeper.clients.exceptions.StreamExistsException;
 import org.apache.bookkeeper.clients.exceptions.StreamNotFoundException;
 import org.apache.bookkeeper.common.concurrent.FutureUtils;
-import org.apache.bookkeeper.common.router.IntHashRouter;
+import org.apache.bookkeeper.common.router.BytesHashRouter;
 import org.apache.bookkeeper.schema.TypedSchemas;
 import org.apache.bookkeeper.schema.proto.SchemaInfo;
 import org.apache.bookkeeper.schema.proto.SchemaType;
@@ -54,6 +55,7 @@ import org.apache.bookkeeper.stream.proto.NamespaceConfiguration;
 import org.apache.bookkeeper.stream.proto.StreamConfiguration;
 import org.apache.bookkeeper.stream.proto.StreamSchemaInfo;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.parquet.bytes.BytesUtils;
 
 /**
  * Write to CStream.
@@ -237,14 +239,14 @@ public class CStreamWriter extends WriterBase {
             } else {
                 valueTypedSchema = TypedSchemas.avroSchema(User.getClassSchema());
             }
-            StreamConfig<Integer, GenericRecord> streamConfig = StreamConfig.<Integer, GenericRecord>builder()
-                .schema(StreamSchemaBuilder.<Integer, GenericRecord>builder()
-                    .key(TypedSchemas.int32())
+            StreamConfig<byte[], GenericRecord> streamConfig = StreamConfig.<byte[], GenericRecord>builder()
+                .schema(StreamSchemaBuilder.<byte[], GenericRecord>builder()
+                    .key(TypedSchemas.bytes())
                     .value(valueTypedSchema)
                     .build())
-                .keyRouter(IntHashRouter.of())
+                .keyRouter(BytesHashRouter.of())
                 .build();
-            List<Pair<Integer, Stream<Integer, GenericRecord>>> streams = new ArrayList<>(flags.numStreams);
+            List<Pair<Integer, Stream<byte[], GenericRecord>>> streams = new ArrayList<>(flags.numStreams);
             for (int i = 0; i < flags.numStreams; i++) {
                 String streamName;
                 if (-1 != flags.streamOrder) {
@@ -253,7 +255,7 @@ public class CStreamWriter extends WriterBase {
                     streamName = String.format(flags.streamName, i);
                 }
                 try {
-                    Stream<Integer, GenericRecord> stream = FutureUtils.result(storageClient.openStream(streamName, streamConfig));
+                    Stream<byte[], GenericRecord> stream = FutureUtils.result(storageClient.openStream(streamName, streamConfig));
                     streams.add(Pair.of(i, stream));
                 } catch (StreamNotFoundException snfe) {
                     log.error("stream not found ", snfe);
@@ -268,7 +270,7 @@ public class CStreamWriter extends WriterBase {
         }
     }
 
-    private void execute(List<Pair<Integer, Stream<Integer, GenericRecord>>> streams) throws Exception {
+    private void execute(List<Pair<Integer, Stream<byte[], GenericRecord>>> streams) throws Exception {
         // register shutdown hook to aggregate stats
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             isDone.set(true);
@@ -282,7 +284,7 @@ public class CStreamWriter extends WriterBase {
             final double writeRateForThisThread = flags.writeRate / flags.numThreads;
             for (int i = 0; i < flags.numThreads; i++) {
                 final int idx = i;
-                final List<Stream<Integer, GenericRecord>> logsThisThread = streams
+                final List<Stream<byte[], GenericRecord>> logsThisThread = streams
                     .stream()
                     .filter(pair -> pair.getLeft() % flags.numThreads == idx)
                     .map(pair -> pair.getRight())
@@ -313,7 +315,7 @@ public class CStreamWriter extends WriterBase {
         }
     }
 
-    void write(List<Stream<Integer, GenericRecord>> streams,
+    void write(List<Stream<byte[], GenericRecord>> streams,
                double writeRate,
                long numRecordsForThisThread,
                long numBytesForThisThread) throws Exception {
@@ -321,10 +323,10 @@ public class CStreamWriter extends WriterBase {
             .maxBufferSize(flags.bufferSize)
             .maxBufferedEvents(flags.maxEventNum)
             .flushDuration(Duration.ofMillis(flags.flushDurationMs)).build();
-        List<CompletableFuture<Writer<Integer, GenericRecord>>> writerFutures = streams.stream()
+        List<CompletableFuture<Writer<byte[], GenericRecord>>> writerFutures = streams.stream()
             .map(stream -> stream.openWriter(writerConfig))
             .collect(Collectors.toList());
-        List<Writer<Integer, GenericRecord>> writers = result(FutureUtils.collect(writerFutures));
+        List<Writer<byte[], GenericRecord>> writers = result(FutureUtils.collect(writerFutures));
 
         DataSource<GenericRecord> dataSource;
         if (null != flags.tableName) {
@@ -341,6 +343,7 @@ public class CStreamWriter extends WriterBase {
             numBytesForThisThread);
 
         int key = 0;
+        MessageDigest md = MessageDigest.getInstance("MD5");
 
 
         long totalWritten = 0L;
@@ -363,9 +366,9 @@ public class CStreamWriter extends WriterBase {
                 if (dataSource.hasNext()) {
                     final long sendTime = System.nanoTime();
                     GenericRecord genericRecord = dataSource.getNext();
-                    WriteEventBuilder<Integer, GenericRecord> eventBuilder = writers.get(i).eventBuilder();
+                    WriteEventBuilder<byte[], GenericRecord> eventBuilder = writers.get(i).eventBuilder();
                     if (0 != flags.bypass) {
-                        eventBuilder.withKey(key++)
+                        eventBuilder.withKey(md.digest(BytesUtils.intToBytes(key++)))
                             .withValue(genericRecord)
                             .withTimestamp(System.currentTimeMillis())
                             .build();
@@ -380,10 +383,11 @@ public class CStreamWriter extends WriterBase {
                         recorder.recordValue(latencyMicros);
                         cumulativeRecorder.recordValue(latencyMicros);
                     } else {
-                        CompletableFuture<WriteResult> eventFuture = writers.get(i).write(eventBuilder.withKey(key++)
-                            .withValue(genericRecord)
-                            .withTimestamp(System.currentTimeMillis())
-                            .build());
+                        CompletableFuture<WriteResult> eventFuture = writers.get(i).write(
+                            eventBuilder.withKey(md.digest(BytesUtils.intToBytes(key++)))
+                                .withValue(genericRecord)
+                                .withTimestamp(System.currentTimeMillis())
+                                .build());
                         eventFuture.thenAccept(writeResult -> {
 
                             eventsWritten.increment();
@@ -484,7 +488,7 @@ public class CStreamWriter extends WriterBase {
         }
         StreamSchemaInfo streamSchemaInfo = StreamSchemaInfo.newBuilder()
             .setKeySchema(SchemaInfo.newBuilder()
-                .setSchemaType(SchemaType.INT32)
+                .setSchemaType(SchemaType.BYTES)
                 .build())
             .setValSchema(SchemaInfo.newBuilder()
                 .setSchemaType(SchemaType.STRUCT)
