@@ -188,7 +188,7 @@ public class CStreamWriter extends WriterBase {
 
     public CStreamWriter(Flags flags) {
         this.flags = flags;
-        if(flags.prometheusEnable) {
+        if (flags.prometheusEnable) {
             startPrometheusServer(flags.prometheusPort);
         }
     }
@@ -322,11 +322,19 @@ public class CStreamWriter extends WriterBase {
                     .collect(Collectors.toList());
                 executor.submit(() -> {
                     try {
-                        write(
-                            logsThisThread,
-                            writeRateForThisThread,
-                            numRecordsForThisThread,
-                            numBytesForThisThread);
+                        if (flags.prometheusEnable) {
+                            writeWithPrometheusMonitor(
+                                logsThisThread,
+                                writeRateForThisThread,
+                                numRecordsForThisThread,
+                                numBytesForThisThread);
+                        } else {
+                            write(
+                                logsThisThread,
+                                writeRateForThisThread,
+                                numRecordsForThisThread,
+                                numBytesForThisThread);
+                        }
                     } catch (Exception e) {
                         log.error("Encountered error at writing records", e);
                         isDone.set(true);
@@ -350,6 +358,148 @@ public class CStreamWriter extends WriterBase {
                double writeRate,
                long numRecordsForThisThread,
                long numBytesForThisThread) throws Exception {
+        WriterConfig writerConfig = WriterConfig.builder()
+            .maxBufferSize(flags.bufferSize)
+            .maxBufferedEvents(flags.maxEventNum)
+            .flushDuration(Duration.ofMillis(flags.flushDurationMs)).build();
+        List<CompletableFuture<Writer<byte[], GenericRecord>>> writerFutures = streams.stream()
+            .map(stream -> stream.openWriter(writerConfig))
+            .collect(Collectors.toList());
+        List<Writer<byte[], GenericRecord>> writers = result(FutureUtils.collect(writerFutures));
+
+        DataSource<GenericRecord> dataSource;
+        if (null != flags.tableName) {
+            dataSource = TpchDataSourceFactory.getTblDataSource(writeRate, flags.tableName, flags.scaleFactor);
+        } else {
+            dataSource = new AvroDataSource(writeRate, flags.schemaFile);
+        }
+
+        log.info("Write thread started with : logs = {}, rate = {},"
+                + " num records = {}, num bytes = {}",
+            streams.stream().map(l -> l.toString()).collect(Collectors.toList()),
+            writeRate,
+            numRecordsForThisThread,
+            numBytesForThisThread);
+
+        int key = 0;
+        MessageDigest md = MessageDigest.getInstance("MD5");
+
+
+        long totalWritten = 0L;
+        long totalBytesWritten = 0L;
+        int eventSize = dataSource.getEventSize();
+        final int numStream = streams.size();
+        while (true) {
+            for (int i = 0; i < numStream; i++) {
+                if (numRecordsForThisThread > 0
+                    && totalWritten >= numRecordsForThisThread) {
+                    markPerfDone();
+                }
+                if (numBytesForThisThread > 0
+                    && totalBytesWritten >= numBytesForThisThread) {
+                    markPerfDone();
+                }
+
+                totalWritten++;
+                totalBytesWritten += eventSize;
+                if (dataSource.hasNext()) {
+                    final long sendTime = System.nanoTime();
+                    GenericRecord genericRecord = dataSource.getNext();
+                    WriteEventBuilder<byte[], GenericRecord> eventBuilder = writers.get(i).eventBuilder();
+                    if (0 != flags.bypass) {
+                        eventBuilder.withKey(md.digest(BytesUtils.intToBytes(key++)))
+                            .withValue(genericRecord)
+                            .withTimestamp(System.currentTimeMillis())
+                            .build();
+                        eventsWritten.increment();
+                        bytesWritten.add(eventSize);
+                        cumulativeEventsWritten.increment();
+                        cumulativeBytesWritten.add(eventSize);
+
+                        long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                            System.nanoTime() - sendTime
+                        );
+                        recorder.recordValue(latencyMicros);
+                        cumulativeRecorder.recordValue(latencyMicros);
+                    } else {
+                        CompletableFuture<WriteResult> eventFuture = writers.get(i).write(
+                            eventBuilder.withKey(md.digest(BytesUtils.intToBytes(key++)))
+                                .withValue(genericRecord)
+                                .withTimestamp(System.currentTimeMillis())
+                                .build());
+                        eventFuture.thenAccept(writeResult -> {
+
+                            writtenEvents.inc();
+                            eventsWritten.increment();
+                            bytesWritten.add(eventSize);
+                            cumulativeEventsWritten.increment();
+                            cumulativeBytesWritten.add(eventSize);
+
+                            long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                System.nanoTime() - sendTime
+                            );
+                            recorder.recordValue(latencyMicros);
+                            cumulativeRecorder.recordValue(latencyMicros);
+                        }).exceptionally(cause -> {
+                            log.warn("Error at writing records", cause);
+                            isDone.set(true);
+                            System.exit(-1);
+                            return null;
+                        });
+                    }
+                } else {
+                    if (null != flags.tableName) {
+                        switch (flags.tableName) {
+                            case "orders":
+                                if (!((TpchDataSourceFactory.OrdersDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "customer":
+                                if (!((TpchDataSourceFactory.CustomerDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "lineitem":
+                                if (!((TpchDataSourceFactory.LineitemDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "part":
+                                if (!((TpchDataSourceFactory.PartDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "partsupp":
+                                if (!((TpchDataSourceFactory.PartsuppDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "supplier":
+                                if (!((TpchDataSourceFactory.SupplierDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            default:
+                                log.error("Shouldn't come to here!");
+                                System.exit(-1);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void writeWithPrometheusMonitor(List<Stream<byte[], GenericRecord>> streams,
+                                    double writeRate,
+                                    long numRecordsForThisThread,
+                                    long numBytesForThisThread) throws Exception {
         WriterConfig writerConfig = WriterConfig.builder()
             .maxBufferSize(flags.bufferSize)
             .maxBufferedEvents(flags.maxEventNum)
