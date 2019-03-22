@@ -19,8 +19,6 @@
 package me.jinsui.shennong.bench.utils;
 
 import com.beust.jcommander.Parameter;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Default CLI Options.
@@ -74,8 +72,8 @@ public class CliFlags {
         names = {
             "-ep", "--enable-prometheus"
         },
-        description = "Enable Prometheus server to record stats. Default true")
-    public boolean prometheusEnable = true;
+        description = "Enable Prometheus server to record stats. Default false")
+    public boolean prometheusEnable = false;
 
     @Parameter(
         names = {
