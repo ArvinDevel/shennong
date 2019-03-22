@@ -3,6 +3,8 @@ package me.jinsui.shennong.bench.writer;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Summary;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -130,6 +132,27 @@ public class HDFSWriter extends WriterBase {
             startPrometheusServer(flags.prometheusPort);
         }
     }
+
+    private static Counter writtenEvents =
+        Counter.build()
+            .name("write_requests_finished_total")
+            .help("Total write requests.")
+            .register();
+    private static Counter writtenBytes =
+        Counter.build()
+            .name("write_bytes_finished_total")
+            .help("Total write bytes.")
+            .register();
+    private static Summary writtenLats =
+        Summary.build()
+            .quantile(0.5, 0.05)   // Add 50th percentile (= median) with 5% tolerated error
+            .quantile(0.75, 0.01)
+            .quantile(0.9, 0.01)   // Add 90th percentile with 1% tolerated error
+            .quantile(0.99, 0.001)
+            .quantile(0.999, 0.0001)
+            .name("request_duration_seconds")
+            .help("Total write latencies.")
+            .register();
 
     @Override
     protected void execute() throws Exception {
@@ -284,6 +307,7 @@ public class HDFSWriter extends WriterBase {
                 if (dataSource.hasNext()) {
                     final long sendTime = System.nanoTime();
                     GenericRecord msg = dataSource.getNext();
+                    Summary.Timer requestTimer = writtenLats.startTimer();
                     if (0 == flags.bypass) {
                         writers.get(i).write(msg);
                     }
@@ -299,6 +323,9 @@ public class HDFSWriter extends WriterBase {
                     // accumulated stats is more suitable for file scenario
                     cumulativeEventsWritten.increment();
                     cumulativeBytesWritten.add(eventSize);
+                    requestTimer.observeDuration();
+                    writtenBytes.inc();
+                    writtenEvents.inc(eventSize);
                 } else {
                     if (null != flags.tableName) {
                         // as tpch factor restricted total data, so terminate program

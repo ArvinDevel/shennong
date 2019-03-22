@@ -17,6 +17,8 @@ package me.jinsui.shennong.bench.reader;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Summary;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -125,7 +127,26 @@ public class KafkaReader extends ReaderBase {
 
     public KafkaReader(Flags flags) {
         this.flags = flags;
+        if(flags.prometheusEnable) {
+            startPrometheusServer(flags.prometheusPort);
+        }
     }
+
+    private static Counter readEventsForPrometheus =
+        Counter.build()
+            .name("read_requests_finished_total")
+            .help("Total read requests.")
+            .register();
+    private static Counter readBytes =
+        Counter.build()
+            .name("read_bytes_finished_total")
+            .help("Total read bytes.")
+            .register();
+    private static Summary readLats =
+        Summary.build()
+            .name("request_duration_seconds")
+            .help("Total read latencies.")
+            .register();
 
     protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
@@ -212,6 +233,7 @@ public class KafkaReader extends ReaderBase {
         int backoffNum = 0;
         while (true) {
             for (KafkaConsumer consumer : consumersInThisThread) {
+                Summary.Timer requestTimer = readLats.startTimer();
                 ConsumerRecords<Long, GenericRecord> records = consumer.poll(flags.pollTimeoutMs);
                 if (records.count() == 0 && flags.readEndless == 0) {
                     if (backoffNum > flags.maxBackoffNum) {
@@ -224,16 +246,21 @@ public class KafkaReader extends ReaderBase {
                 }
                 // reset backoffNum
                 backoffNum = 0;
-                eventsRead.add(records.count());
-                cumulativeEventsRead.add(records.count());
+                int num = records.count();
+                eventsRead.add(num);
+                cumulativeEventsRead.add(num);
+                requestTimer.observeDuration();
+                readEventsForPrometheus.inc(num);
                 // filter according to read column
                 for (ConsumerRecord<Long, GenericRecord> record : records) {
                     for (String field : readFields) {
                         Object data = record.value().get(field);
                     }
                     // TODO how to estimate field value size
-                    bytesRead.add(record.serializedValueSize());
-                    cumulativeBytesRead.add(record.serializedValueSize());
+                    int size = record.serializedValueSize();
+                    bytesRead.add(size);
+                    cumulativeBytesRead.add(size);
+                    readBytes.inc(size);
                 }
             }
         }

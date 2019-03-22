@@ -3,6 +3,8 @@ package me.jinsui.shennong.bench.writer;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Summary;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -105,7 +107,26 @@ public class KafkaWriter extends WriterBase {
     private final Flags flags;
     private final KafkaProducer<Long, byte[]> bytesProducer;
     private final byte[] payload;
-
+    private static Counter writtenEvents =
+        Counter.build()
+            .name("write_requests_finished_total")
+            .help("Total write requests.")
+            .register();
+    private static Counter writtenBytes =
+        Counter.build()
+            .name("write_bytes_finished_total")
+            .help("Total write bytes.")
+            .register();
+    private static Summary writtenLats =
+        Summary.build()
+            .quantile(0.5, 0.05)   // Add 50th percentile (= median) with 5% tolerated error
+            .quantile(0.75, 0.01)
+            .quantile(0.9, 0.01)   // Add 90th percentile with 1% tolerated error
+            .quantile(0.99, 0.001)
+            .quantile(0.999, 0.0001)
+            .name("request_duration_seconds")
+            .help("Total write latencies.")
+            .register();
 
     public KafkaWriter(Flags flags) {
         this.flags = flags;
@@ -124,7 +145,7 @@ public class KafkaWriter extends WriterBase {
             this.bytesProducer = null;
             this.payload = null;
         }
-        if(flags.prometheusEnable) {
+        if (flags.prometheusEnable) {
             startPrometheusServer(flags.prometheusPort);
         }
     }
@@ -283,6 +304,7 @@ public class KafkaWriter extends WriterBase {
                             }
                         } else {
                             GenericRecord msg = dataSource.getNext();
+                            Summary.Timer requestTimer = writtenLats.startTimer();
                             if (0 != flags.bypass) {
                                 new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), msg);
                                 eventsWritten.increment();
@@ -290,6 +312,9 @@ public class KafkaWriter extends WriterBase {
                                 cumulativeEventsWritten.increment();
                                 cumulativeBytesWritten.add(eventSize);
 
+                                requestTimer.observeDuration();
+                                writtenBytes.inc();
+                                writtenEvents.inc(eventSize);
                                 long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                                     System.nanoTime() - sendTime
                                 );
@@ -307,6 +332,9 @@ public class KafkaWriter extends WriterBase {
                                             bytesWritten.add(eventSize);
                                             cumulativeEventsWritten.increment();
                                             cumulativeBytesWritten.add(eventSize);
+                                            requestTimer.observeDuration();
+                                            writtenBytes.inc();
+                                            writtenEvents.inc(eventSize);
 
                                             long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                                                 System.nanoTime() - sendTime

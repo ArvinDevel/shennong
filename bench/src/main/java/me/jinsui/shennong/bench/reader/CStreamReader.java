@@ -184,6 +184,9 @@ public class CStreamReader extends ReaderBase {
 
     public CStreamReader(Flags flags) {
         this.flags = flags;
+        if(flags.prometheusEnable) {
+            startPrometheusServer(flags.prometheusPort);
+        }
     }
     private static Counter readEventsForPrometheus =
         Counter.build()
@@ -338,11 +341,13 @@ public class CStreamReader extends ReaderBase {
         int backoffNum = 0;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
+                Summary.Timer requestTimer = readLats.startTimer();
                 readEvents = readers.get(i).readNext(flags.pollTimeoutMs, TimeUnit.MILLISECONDS);
                 if (null != readEvents) {
                     final long receiveTime = System.currentTimeMillis();
                     int num = readEvents.numEvents();
                     int size = readEvents.getEstimatedSize();
+                    requestTimer.observeDuration();
                     readEventsForPrometheus.inc(num);
                     readBytes.inc(size);
 
@@ -411,12 +416,18 @@ public class CStreamReader extends ReaderBase {
                 columnVectors = columnVectorsList.get(i);
                 if (null != columnVectors) {
                     if (columnVectors.hasNext()) {
+                        Summary.Timer requestTimer = readLats.startTimer();
                         ColumnVector columnVector = columnVectors.next(flags.pollTimeoutMs, TimeUnit.MILLISECONDS);
                         if (null != columnVector) {
-                            cumulativeEventsRead.add(columnVector.num());
-                            cumulativeBytesRead.add(columnVector.estimatedSize());
-                            eventsRead.add(columnVector.num());
-                            bytesRead.add(columnVector.estimatedSize());
+                            int num = columnVector.num();
+                            int size = columnVector.estimatedSize();
+                            requestTimer.observeDuration();
+                            readEventsForPrometheus.inc(num);
+                            readBytes.inc(size);
+                            cumulativeEventsRead.add(num);
+                            cumulativeBytesRead.add(size);
+                            eventsRead.add(num);
+                            bytesRead.add(size);
                             if (((EventPositionImpl) columnVector.position()).getRangeSeqNum() % 1000 == 0) {
                                 log.info("Column vector's stream is {}, end position is {} ",
                                     columnVector.stream(), columnVector.position());

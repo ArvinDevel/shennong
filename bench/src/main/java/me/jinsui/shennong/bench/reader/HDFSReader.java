@@ -17,6 +17,8 @@ package me.jinsui.shennong.bench.reader;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Summary;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -133,8 +135,26 @@ public class HDFSReader extends ReaderBase {
 
     public HDFSReader(Flags flags) {
         this.flags = flags;
+        if(flags.prometheusEnable) {
+            startPrometheusServer(flags.prometheusPort);
+        }
     }
 
+    private static Counter readEventsForPrometheus =
+        Counter.build()
+            .name("read_requests_finished_total")
+            .help("Total read requests.")
+            .register();
+    private static Counter readBytes =
+        Counter.build()
+            .name("read_bytes_finished_total")
+            .help("Total read bytes.")
+            .register();
+    private static Summary readLats =
+        Summary.build()
+            .name("request_duration_seconds")
+            .help("Total read latencies.")
+            .register();
 
     protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
@@ -268,11 +288,15 @@ public class HDFSReader extends ReaderBase {
         int backoffNum = 0;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
+                Summary.Timer requestTimer = readLats.startTimer();
                 readData = readers.get(i).read();
                 if (null != readData) {
                     final long receiveTime = System.currentTimeMillis();
                     eventsRead.increment();
                     cumulativeEventsRead.increment();
+
+                    requestTimer.observeDuration();
+                    readEventsForPrometheus.inc();
                     // todo estimate read size
 //                    bytesRead.add(readData.getEstimatedSize());
 //                    cumulativeBytesRead.add(readEvents.getEstimatedSize());
