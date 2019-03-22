@@ -126,10 +126,13 @@ public class HDFSWriter extends WriterBase {
 
     public HDFSWriter(Flags flags) {
         this.flags = flags;
+        if(flags.prometheusEnable) {
+            startPrometheusServer(flags.prometheusPort);
+        }
     }
 
     @Override
-    void execute() throws Exception {
+    protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
         ObjectWriter w = m.writerWithDefaultPrettyPrinter();
         log.info("Starting parquet writer over HDFS with config : {}", w.writeValueAsString(flags));

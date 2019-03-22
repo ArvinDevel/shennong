@@ -6,6 +6,9 @@ import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.protobuf.ByteString;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Histogram;
+import io.prometheus.client.Summary;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -162,13 +165,36 @@ public class CStreamWriter extends WriterBase {
     }
 
     private final Flags flags;
+    private static Counter writtenEvents =
+        Counter.build()
+            .name("write_requests_finished_total")
+            .help("Total write requests.")
+            .register();
+    private static Counter writtenBytes =
+        Counter.build()
+            .name("write_bytes_finished_total")
+            .help("Total write bytes.")
+            .register();
+    private static Summary writtenLats =
+        Summary.build()
+            .quantile(0.5, 0.05)   // Add 50th percentile (= median) with 5% tolerated error
+            .quantile(0.75, 0.01)
+            .quantile(0.9, 0.01)   // Add 90th percentile with 1% tolerated error
+            .quantile(0.99, 0.001)
+            .quantile(0.999, 0.0001)
+            .name("request_duration_seconds")
+            .help("Total write latencies.")
+            .register();
 
     public CStreamWriter(Flags flags) {
         this.flags = flags;
+        if(flags.prometheusEnable) {
+            startPrometheusServer(flags.prometheusPort);
+        }
     }
 
     @Override
-    void execute() throws Exception {
+    protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
         ObjectWriter w = m.writerWithDefaultPrettyPrinter();
         log.info("Starting schema stream storage writer with config : {}", w.writeValueAsString(flags));
@@ -192,13 +218,18 @@ public class CStreamWriter extends WriterBase {
                 log.warn("create namespace fail ", ce);
             }
             for (int i = 0; i < flags.numStreams; i++) {
-                String streamName = String.format(flags.streamName, i);
+                String streamName;
+                if (-1 != flags.streamOrder) {
+                    streamName = String.format(flags.streamName, flags.streamOrder);
+                } else {
+                    streamName = String.format(flags.streamName, i);
+                }
                 try {
                     FutureUtils.result(adminClient.createStream(flags.namespaceName, streamName, streamConf));
                 } catch (StreamExistsException see) {
                     // swallow
                 } catch (ClientException ce) {
-                    log.warn("create schema stream fail ", ce);
+                    log.warn("create schema stream {} fail ", streamName, ce);
                 }
             }
             log.info("Successfully create schema streams, and begin open them");
@@ -366,6 +397,7 @@ public class CStreamWriter extends WriterBase {
                 if (dataSource.hasNext()) {
                     final long sendTime = System.nanoTime();
                     GenericRecord genericRecord = dataSource.getNext();
+                    Summary.Timer requestTimer = writtenLats.startTimer();
                     WriteEventBuilder<byte[], GenericRecord> eventBuilder = writers.get(i).eventBuilder();
                     if (0 != flags.bypass) {
                         eventBuilder.withKey(md.digest(BytesUtils.intToBytes(key++)))
@@ -377,6 +409,9 @@ public class CStreamWriter extends WriterBase {
                         cumulativeEventsWritten.increment();
                         cumulativeBytesWritten.add(eventSize);
 
+                        requestTimer.observeDuration();
+                        writtenBytes.inc();
+                        writtenEvents.inc(eventSize);
                         long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                             System.nanoTime() - sendTime
                         );
@@ -389,7 +424,12 @@ public class CStreamWriter extends WriterBase {
                                 .withTimestamp(System.currentTimeMillis())
                                 .build());
                         eventFuture.thenAccept(writeResult -> {
+                            // prometheus
+                            requestTimer.observeDuration();
+                            writtenBytes.inc();
+                            writtenEvents.inc(eventSize);
 
+                            writtenEvents.inc();
                             eventsWritten.increment();
                             bytesWritten.add(eventSize);
                             cumulativeEventsWritten.increment();

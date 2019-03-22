@@ -27,9 +27,6 @@ import java.util.List;
  */
 public class CliFlags {
 
-    @Parameter(description = "args")
-    public List<String> arguments = new ArrayList<>();
-
     @Parameter(
         names = {
             "-h", "--help"
@@ -72,5 +69,19 @@ public class CliFlags {
         description = "Write/Read one specific stream only, default -1 write/read all stream." +
             " It's better used with -s/t/f =1 to read one stream and multiple bench process to produce/consume all streams.")
     public int streamOrder = -1;
+
+    @Parameter(
+        names = {
+            "-ep", "--enable-prometheus"
+        },
+        description = "Enable Prometheus server to record stats. Default true")
+    public boolean prometheusEnable = true;
+
+    @Parameter(
+        names = {
+            "-pp", "--prometheus-port"
+        },
+        description = "Prometheus server port to monitor bench performance. Default 5080")
+    public int prometheusPort = 5080;
 
 }

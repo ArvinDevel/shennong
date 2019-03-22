@@ -127,15 +127,6 @@ public class KafkaReader extends ReaderBase {
         this.flags = flags;
     }
 
-    @Override
-    public void run() {
-        try {
-            execute();
-        } catch (Exception e) {
-            log.error("Encountered exception at running schema stream storage reader", e);
-        }
-    }
-
     protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
         ObjectWriter w = m.writerWithDefaultPrettyPrinter();

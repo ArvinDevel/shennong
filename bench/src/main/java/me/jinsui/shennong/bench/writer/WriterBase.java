@@ -5,11 +5,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.BenchBase;
 import org.HdrHistogram.Histogram;
 import org.HdrHistogram.Recorder;
 
 @Slf4j
-public abstract class WriterBase implements Runnable {
+public abstract class WriterBase extends BenchBase {
     final AtomicBoolean isDone = new AtomicBoolean(false);
     final Recorder recorder = new Recorder(
         TimeUnit.SECONDS.toMillis(120000), 5
@@ -26,17 +27,6 @@ public abstract class WriterBase implements Runnable {
     final LongAdder cumulativeEventsWritten = new LongAdder();
     final LongAdder cumulativeBytesWritten = new LongAdder();
     long startTime;
-
-    @Override
-    public void run() {
-        try {
-            execute();
-        } catch (Exception e) {
-            log.error("Encountered exception at running schema stream storage writer", e);
-        }
-    }
-
-    abstract void execute() throws Exception;
 
     void markPerfDone() throws Exception {
         log.info("------------------- DONE -----------------------");
@@ -89,7 +79,6 @@ public abstract class WriterBase implements Runnable {
         }
 
     }
-
 
     private static final DecimalFormat throughputFormat = new DecimalFormat("0.0");
     private static final DecimalFormat dec = new DecimalFormat("0.000");

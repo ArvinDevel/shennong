@@ -135,14 +135,6 @@ public class HDFSReader extends ReaderBase {
         this.flags = flags;
     }
 
-    @Override
-    public void run() {
-        try {
-            execute();
-        } catch (Exception e) {
-            log.error("Encountered exception at running parquet reader over hdfs", e);
-        }
-    }
 
     protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();

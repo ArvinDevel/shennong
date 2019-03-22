@@ -124,6 +124,9 @@ public class KafkaWriter extends WriterBase {
             this.bytesProducer = null;
             this.payload = null;
         }
+        if(flags.prometheusEnable) {
+            startPrometheusServer(flags.prometheusPort);
+        }
     }
 
     private Properties newKafkaProperties(Flags flags) {
@@ -147,7 +150,7 @@ public class KafkaWriter extends WriterBase {
     }
 
     @Override
-    void execute() throws Exception {
+    protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
         ObjectWriter w = m.writerWithDefaultPrettyPrinter();
         log.info("Starting kafka writer with config : {}", w.writeValueAsString(flags));

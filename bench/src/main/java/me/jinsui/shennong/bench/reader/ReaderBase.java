@@ -5,11 +5,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.LongAdder;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.BenchBase;
 import org.HdrHistogram.Histogram;
 import org.HdrHistogram.Recorder;
 
 @Slf4j
-public abstract class ReaderBase implements Runnable {
+public abstract class ReaderBase extends BenchBase {
     final AtomicBoolean isDone = new AtomicBoolean(false);
     final Recorder recorder = new Recorder(
         TimeUnit.SECONDS.toMillis(120000), 5
@@ -27,17 +28,6 @@ public abstract class ReaderBase implements Runnable {
     final LongAdder cumulativeBytesRead = new LongAdder();
     // used to calculate aggregated stats, needs set on subClass
     long startTime;
-
-    @Override
-    public void run() {
-        try {
-            execute();
-        } catch (Exception e) {
-            log.error("Encountered exception at running storage reader", e);
-        }
-    }
-
-    abstract void execute() throws Exception;
 
     void reportStats() {
         // Print report stats
@@ -82,7 +72,6 @@ public abstract class ReaderBase implements Runnable {
         }
 
     }
-
 
     private static final DecimalFormat throughputFormat = new DecimalFormat("0.0");
     private static final DecimalFormat dec = new DecimalFormat("0.000");
