@@ -135,26 +135,29 @@ public class HDFSReader extends ReaderBase {
 
     public HDFSReader(Flags flags) {
         this.flags = flags;
-        if(flags.prometheusEnable) {
+        if (flags.prometheusEnable) {
             startPrometheusServer(flags.prometheusPort);
+            readEventsForPrometheus =
+                Counter.build()
+                    .name("read_requests_finished_total")
+                    .help("Total read requests.")
+                    .register();
+            readBytes =
+                Counter.build()
+                    .name("read_bytes_finished_total")
+                    .help("Total read bytes.")
+                    .register();
+            readLats =
+                Summary.build()
+                    .name("request_duration_seconds")
+                    .help("Total read latencies.")
+                    .register();
         }
     }
 
-    private static Counter readEventsForPrometheus =
-        Counter.build()
-            .name("read_requests_finished_total")
-            .help("Total read requests.")
-            .register();
-    private static Counter readBytes =
-        Counter.build()
-            .name("read_bytes_finished_total")
-            .help("Total read bytes.")
-            .register();
-    private static Summary readLats =
-        Summary.build()
-            .name("request_duration_seconds")
-            .help("Total read latencies.")
-            .register();
+    private static Counter readEventsForPrometheus;
+    private static Counter readBytes;
+    private static Summary readLats;
 
     protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
@@ -253,7 +256,11 @@ public class HDFSReader extends ReaderBase {
                     .collect(Collectors.toList());
                 executor.submit(() -> {
                     try {
-                        read(logsThisThread);
+                        if (flags.prometheusEnable) {
+                            readWithPrometheusMonitor(logsThisThread);
+                        } else {
+                            read(logsThisThread);
+                        }
                     } catch (Exception e) {
                         log.error("Encountered error at reading records", e);
                         System.exit(-1);
@@ -291,6 +298,38 @@ public class HDFSReader extends ReaderBase {
                 Summary.Timer requestTimer = readLats.startTimer();
                 readData = readers.get(i).read();
                 if (null != readData) {
+                    eventsRead.increment();
+                    cumulativeEventsRead.increment();
+
+                    // todo estimate read size
+//                    bytesRead.add(readData.getEstimatedSize());
+//                    cumulativeBytesRead.add(readEvents.getEstimatedSize());
+                    // reset backoffNum
+                    backoffNum = 0;
+                } else if (flags.readEndless == 0) {
+                    if (backoffNum > flags.maxBackoffNum) {
+                        log.info("No more data after {} retry number, shut down", flags.maxBackoffNum);
+                        System.exit(-1);
+                    } else {
+                        backoffNum++;
+                    }
+                }
+            }
+        }
+    }
+
+    void readWithPrometheusMonitor(List<ParquetReader<GenericRecord>> readers) throws Exception {
+        log.info("Read thread started with : logs = {}",
+            readers.stream().map(stream -> stream.toString()).collect(Collectors.toList()));
+
+        final int numLogs = readers.size();
+        GenericRecord readData;
+        int backoffNum = 0;
+        while (true) {
+            for (int i = 0; i < numLogs; i++) {
+                Summary.Timer requestTimer = readLats.startTimer();
+                readData = readers.get(i).read();
+                if (null != readData) {
                     final long receiveTime = System.currentTimeMillis();
                     eventsRead.increment();
                     cumulativeEventsRead.increment();
@@ -314,28 +353,4 @@ public class HDFSReader extends ReaderBase {
         }
     }
 
-    private static Schema.Field findField(Schema schema, String name) {
-        if (schema.getField(name) != null) {
-            return schema.getField(name);
-        }
-
-        Schema.Field foundField = null;
-
-        for (Schema.Field field : schema.getFields()) {
-            Schema fieldSchema = field.schema();
-            if (Schema.Type.RECORD.equals(fieldSchema.getType())) {
-                foundField = findField(fieldSchema, name);
-            } else if (Schema.Type.ARRAY.equals(fieldSchema.getType())) {
-                foundField = findField(fieldSchema.getElementType(), name);
-            } else if (Schema.Type.MAP.equals(fieldSchema.getType())) {
-                foundField = findField(fieldSchema.getValueType(), name);
-            }
-
-            if (foundField != null) {
-                return foundField;
-            }
-        }
-
-        return foundField;
-    }
 }

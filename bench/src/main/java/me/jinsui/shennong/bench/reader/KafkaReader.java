@@ -127,26 +127,29 @@ public class KafkaReader extends ReaderBase {
 
     public KafkaReader(Flags flags) {
         this.flags = flags;
-        if(flags.prometheusEnable) {
+        if (flags.prometheusEnable) {
             startPrometheusServer(flags.prometheusPort);
+            readEventsForPrometheus =
+                Counter.build()
+                    .name("read_requests_finished_total")
+                    .help("Total read requests.")
+                    .register();
+            readBytes =
+                Counter.build()
+                    .name("read_bytes_finished_total")
+                    .help("Total read bytes.")
+                    .register();
+            readLats =
+                Summary.build()
+                    .name("request_duration_seconds")
+                    .help("Total read latencies.")
+                    .register();
         }
     }
 
-    private static Counter readEventsForPrometheus =
-        Counter.build()
-            .name("read_requests_finished_total")
-            .help("Total read requests.")
-            .register();
-    private static Counter readBytes =
-        Counter.build()
-            .name("read_bytes_finished_total")
-            .help("Total read bytes.")
-            .register();
-    private static Summary readLats =
-        Summary.build()
-            .name("request_duration_seconds")
-            .help("Total read latencies.")
-            .register();
+    private Counter readEventsForPrometheus;
+    private Counter readBytes;
+    private Summary readLats;
 
     protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
@@ -211,6 +214,58 @@ public class KafkaReader extends ReaderBase {
     }
 
     private void read(List<KafkaConsumer> consumersInThisThread) {
+        log.info("Read thread started with : topics = {}", consumersInThisThread);
+
+        // set consume position to head compulsively to avoid can't read from head again after read once
+        if (flags.consumePosition != -1) {
+            for (KafkaConsumer consumer : consumersInThisThread) {
+                // to get assignment of the consumer
+                consumer.poll(flags.pollTimeoutMs);
+                log.info("consumer {} has partitions {} ", consumer, consumer.assignment());
+                // seek to head
+                if (flags.consumePosition == 0) {
+                    consumer.seekToBeginning(consumer.assignment());
+                } else {
+                    for (TopicPartition topicPartition : (Set<TopicPartition>) consumer.assignment()) {
+                        consumer.seek(topicPartition, flags.consumePosition);
+                    }
+                }
+            }
+        }
+        String[] readFields = flags.readColumn.split(",");
+        int backoffNum = 0;
+        while (true) {
+            for (KafkaConsumer consumer : consumersInThisThread) {
+                ConsumerRecords<Long, GenericRecord> records = consumer.poll(flags.pollTimeoutMs);
+                if (records.count() == 0 && flags.readEndless == 0) {
+                    if (backoffNum > flags.maxBackoffNum) {
+                        log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                        System.exit(-1);
+                    } else {
+                        backoffNum++;
+                    }
+                    continue;
+                }
+                // reset backoffNum
+                backoffNum = 0;
+                int num = records.count();
+                eventsRead.add(num);
+                cumulativeEventsRead.add(num);
+                // filter according to read column
+                for (ConsumerRecord<Long, GenericRecord> record : records) {
+                    for (String field : readFields) {
+                        Object data = record.value().get(field);
+                    }
+                    // TODO how to estimate field value size
+                    int size = record.serializedValueSize();
+                    bytesRead.add(size);
+                    cumulativeBytesRead.add(size);
+                }
+            }
+        }
+    }
+
+    private void readWithPrometheusMonitor(List<KafkaConsumer> consumersInThisThread) {
         log.info("Read thread started with : topics = {}", consumersInThisThread);
 
         // set consume position to head compulsively to avoid can't read from head again after read once

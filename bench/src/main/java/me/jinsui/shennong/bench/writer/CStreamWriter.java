@@ -165,31 +165,34 @@ public class CStreamWriter extends WriterBase {
     }
 
     private final Flags flags;
-    private static Counter writtenEvents =
-        Counter.build()
-            .name("write_requests_finished_total")
-            .help("Total write requests.")
-            .register();
-    private static Counter writtenBytes =
-        Counter.build()
-            .name("write_bytes_finished_total")
-            .help("Total write bytes.")
-            .register();
-    private static Summary writtenLats =
-        Summary.build()
-            .quantile(0.5, 0.05)   // Add 50th percentile (= median) with 5% tolerated error
-            .quantile(0.75, 0.01)
-            .quantile(0.9, 0.01)   // Add 90th percentile with 1% tolerated error
-            .quantile(0.99, 0.001)
-            .quantile(0.999, 0.0001)
-            .name("request_duration_seconds")
-            .help("Total write latencies.")
-            .register();
+    private static Counter writtenEvents;
+    private static Counter writtenBytes;
+    private static Summary writtenLats;
 
     public CStreamWriter(Flags flags) {
         this.flags = flags;
         if (flags.prometheusEnable) {
             startPrometheusServer(flags.prometheusPort);
+            writtenEvents =
+                Counter.build()
+                    .name("write_requests_finished_total")
+                    .help("Total write requests.")
+                    .register();
+            writtenBytes =
+                Counter.build()
+                    .name("write_bytes_finished_total")
+                    .help("Total write bytes.")
+                    .register();
+            writtenLats =
+                Summary.build()
+                    .quantile(0.5, 0.05)   // Add 50th percentile (= median) with 5% tolerated error
+                    .quantile(0.75, 0.01)
+                    .quantile(0.9, 0.01)   // Add 90th percentile with 1% tolerated error
+                    .quantile(0.99, 0.001)
+                    .quantile(0.999, 0.0001)
+                    .name("request_duration_seconds")
+                    .help("Total write latencies.")
+                    .register();
         }
     }
 
@@ -547,7 +550,6 @@ public class CStreamWriter extends WriterBase {
                 if (dataSource.hasNext()) {
                     final long sendTime = System.nanoTime();
                     GenericRecord genericRecord = dataSource.getNext();
-                    Summary.Timer requestTimer = writtenLats.startTimer();
                     WriteEventBuilder<byte[], GenericRecord> eventBuilder = writers.get(i).eventBuilder();
                     if (0 != flags.bypass) {
                         eventBuilder.withKey(md.digest(BytesUtils.intToBytes(key++)))
@@ -559,12 +561,12 @@ public class CStreamWriter extends WriterBase {
                         cumulativeEventsWritten.increment();
                         cumulativeBytesWritten.add(eventSize);
 
-                        requestTimer.observeDuration();
-                        writtenBytes.inc();
-                        writtenEvents.inc(eventSize);
                         long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                             System.nanoTime() - sendTime
                         );
+                        writtenBytes.inc(eventSize);
+                        writtenEvents.inc();
+                        writtenLats.observe(latencyMicros / 1e6);
                         recorder.recordValue(latencyMicros);
                         cumulativeRecorder.recordValue(latencyMicros);
                     } else {
@@ -574,10 +576,7 @@ public class CStreamWriter extends WriterBase {
                                 .withTimestamp(System.currentTimeMillis())
                                 .build());
                         eventFuture.thenAccept(writeResult -> {
-                            // prometheus
-                            requestTimer.observeDuration();
-                            writtenBytes.inc();
-                            writtenEvents.inc(eventSize);
+
 
                             writtenEvents.inc();
                             eventsWritten.increment();
@@ -588,8 +587,14 @@ public class CStreamWriter extends WriterBase {
                             long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
                                 System.nanoTime() - sendTime
                             );
+
                             recorder.recordValue(latencyMicros);
                             cumulativeRecorder.recordValue(latencyMicros);
+                            // prometheus
+                            writtenBytes.inc();
+                            writtenEvents.inc(eventSize);
+                            writtenLats.observe(latencyMicros / 1e6);
+
                         }).exceptionally(cause -> {
                             log.warn("Error at writing records", cause);
                             isDone.set(true);

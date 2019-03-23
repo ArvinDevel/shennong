@@ -128,31 +128,34 @@ public class HDFSWriter extends WriterBase {
 
     public HDFSWriter(Flags flags) {
         this.flags = flags;
-        if(flags.prometheusEnable) {
+        if (flags.prometheusEnable) {
             startPrometheusServer(flags.prometheusPort);
+            writtenEvents =
+                Counter.build()
+                    .name("write_requests_finished_total")
+                    .help("Total write requests.")
+                    .register();
+            writtenBytes =
+                Counter.build()
+                    .name("write_bytes_finished_total")
+                    .help("Total write bytes.")
+                    .register();
+            writtenLats =
+                Summary.build()
+                    .quantile(0.5, 0.05)   // Add 50th percentile (= median) with 5% tolerated error
+                    .quantile(0.75, 0.01)
+                    .quantile(0.9, 0.01)   // Add 90th percentile with 1% tolerated error
+                    .quantile(0.99, 0.001)
+                    .quantile(0.999, 0.0001)
+                    .name("request_duration_seconds")
+                    .help("Total write latencies.")
+                    .register();
         }
     }
 
-    private static Counter writtenEvents =
-        Counter.build()
-            .name("write_requests_finished_total")
-            .help("Total write requests.")
-            .register();
-    private static Counter writtenBytes =
-        Counter.build()
-            .name("write_bytes_finished_total")
-            .help("Total write bytes.")
-            .register();
-    private static Summary writtenLats =
-        Summary.build()
-            .quantile(0.5, 0.05)   // Add 50th percentile (= median) with 5% tolerated error
-            .quantile(0.75, 0.01)
-            .quantile(0.9, 0.01)   // Add 90th percentile with 1% tolerated error
-            .quantile(0.99, 0.001)
-            .quantile(0.999, 0.0001)
-            .name("request_duration_seconds")
-            .help("Total write latencies.")
-            .register();
+    private static Counter writtenEvents;
+    private static Counter writtenBytes;
+    private static Summary writtenLats;
 
     @Override
     protected void execute() throws Exception {
@@ -242,11 +245,19 @@ public class HDFSWriter extends WriterBase {
                     .collect(Collectors.toList());
                 executor.submit(() -> {
                     try {
-                        write(
-                            writersThisThread,
-                            writeRateForThisThread,
-                            numRecordsForThisThread,
-                            numBytesForThisThread);
+                        if (flags.prometheusEnable) {
+                            writeWithPrometheusMonitor(
+                                writersThisThread,
+                                writeRateForThisThread,
+                                numRecordsForThisThread,
+                                numBytesForThisThread);
+                        } else {
+                            write(
+                                writersThisThread,
+                                writeRateForThisThread,
+                                numRecordsForThisThread,
+                                numBytesForThisThread);
+                        }
                     } catch (Exception e) {
                         log.error("Encountered error at writing records", e);
                         isDone.set(true);
@@ -271,6 +282,117 @@ public class HDFSWriter extends WriterBase {
                        double writeRate,
                        long numRecordsForThisThread,
                        long numBytesForThisThread) throws Exception {
+
+        DataSource<GenericRecord> dataSource;
+        if (null != flags.tableName) {
+            dataSource = TpchDataSourceFactory.getTblDataSource(writeRate, flags.tableName, flags.scaleFactor);
+        } else {
+            dataSource = new AvroDataSource(writeRate, flags.schemaFile);
+        }
+
+        log.info("Write thread started with : logs = {},"
+                + " num records = {}, num bytes = {}",
+            writers.stream().map(l -> l).collect(Collectors.toList()),
+            numRecordsForThisThread,
+            numBytesForThisThread);
+
+
+        long totalWritten = 0L;
+        long totalBytesWritten = 0L;
+        int eventSize = dataSource.getEventSize();
+        final int numStream = writers.size();
+        while (true) {
+            for (int i = 0; i < numStream; i++) {
+                if (numRecordsForThisThread > 0
+                    && totalWritten >= numRecordsForThisThread) {
+                    writers.get(i).close();
+                    markPerfDone();
+                }
+                if (numBytesForThisThread > 0
+                    && totalBytesWritten >= numBytesForThisThread) {
+                    writers.get(i).close();
+                    markPerfDone();
+                }
+                totalWritten++;
+                totalBytesWritten += eventSize;
+                if (dataSource.hasNext()) {
+                    final long sendTime = System.nanoTime();
+                    GenericRecord msg = dataSource.getNext();
+                    if (0 == flags.bypass) {
+                        writers.get(i).write(msg);
+                    }
+                    long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                        System.nanoTime() - sendTime
+                    );
+                    // these stats can't reflex the data written to fs,
+                    // since parquet first cache the data in mem to block_size
+                    eventsWritten.increment();
+                    bytesWritten.add(eventSize);
+                    recorder.recordValue(latencyMicros);
+                    cumulativeRecorder.recordValue(latencyMicros);
+                    // accumulated stats is more suitable for file scenario
+                    cumulativeEventsWritten.increment();
+                    cumulativeBytesWritten.add(eventSize);
+                } else {
+                    if (null != flags.tableName) {
+                        // as tpch factor restricted total data, so terminate program
+                        switch (flags.tableName) {
+                            case "orders":
+                                if (!((TpchDataSourceFactory.OrdersDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            case "lineitem":
+                                if (!((TpchDataSourceFactory.LineitemDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            case "customer":
+                                if (!((TpchDataSourceFactory.CustomerDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            case "part":
+                                if (!((TpchDataSourceFactory.PartDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            case "partsupp":
+                                if (!((TpchDataSourceFactory.PartsuppDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            case "supplier":
+                                if (!((TpchDataSourceFactory.SupplierDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    writers.get(i).close();
+                                    markPerfDone();
+                                }
+                                break;
+                            default:
+                                log.error("Shouldn't come to here!");
+                                System.exit(-1);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void writeWithPrometheusMonitor(List<ParquetWriter<GenericRecord>> writers,
+                                            double writeRate,
+                                            long numRecordsForThisThread,
+                                            long numBytesForThisThread) throws Exception {
 
         DataSource<GenericRecord> dataSource;
         if (null != flags.tableName) {

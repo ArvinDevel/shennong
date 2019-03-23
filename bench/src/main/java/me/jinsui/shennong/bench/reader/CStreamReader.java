@@ -184,25 +184,29 @@ public class CStreamReader extends ReaderBase {
 
     public CStreamReader(Flags flags) {
         this.flags = flags;
-        if(flags.prometheusEnable) {
+        if (flags.prometheusEnable) {
             startPrometheusServer(flags.prometheusPort);
+            readEventsForPrometheus =
+                Counter.build()
+                    .name("read_requests_finished_total")
+                    .help("Total read requests.")
+                    .register();
+            readBytes =
+                Counter.build()
+                    .name("read_bytes_finished_total")
+                    .help("Total read bytes.")
+                    .register();
+            readLats =
+                Summary.build()
+                    .name("request_duration_seconds")
+                    .help("Total read latencies.")
+                    .register();
         }
     }
-    private static Counter readEventsForPrometheus =
-        Counter.build()
-            .name("read_requests_finished_total")
-            .help("Total read requests.")
-            .register();
-    private static Counter readBytes =
-        Counter.build()
-            .name("read_bytes_finished_total")
-            .help("Total read bytes.")
-            .register();
-    private static Summary readLats =
-        Summary.build()
-            .name("request_duration_seconds")
-            .help("Total read latencies.")
-            .register();
+
+    private static Counter readEventsForPrometheus;
+    private static Counter readBytes;
+    private static Summary readLats;
 
     protected void execute() throws Exception {
         ObjectMapper m = new ObjectMapper();
@@ -302,10 +306,18 @@ public class CStreamReader extends ReaderBase {
                     .collect(Collectors.toList());
                 executor.submit(() -> {
                     try {
-                        if (0 == mode) {
-                            read(logsThisThread);
-                        } else if (1 == mode) {
-                            readColumn(logsThisThread);
+                        if (flags.prometheusEnable) {
+                            if (0 == mode) {
+                                readWithPrometheusMonitor(logsThisThread);
+                            } else if (1 == mode) {
+                                readColumnWithPrometheusMonitor(logsThisThread);
+                            }
+                        } else {
+                            if (0 == mode) {
+                                read(logsThisThread);
+                            } else if (1 == mode) {
+                                readColumn(logsThisThread);
+                            }
                         }
                     } catch (Exception e) {
                         log.error("Encountered error at reading records", e);
@@ -327,6 +339,121 @@ public class CStreamReader extends ReaderBase {
 
     // read used by specific thread
     void read(List<Stream<byte[], GenericRecord>> streams) throws Exception {
+        ReaderConfig readerConfig = ReaderConfig.builder()
+            .maxReadAheadCacheSize(flags.readAheadCatchSize).build();
+        List<CompletableFuture<Reader<byte[], GenericRecord>>> readerFutures = streams.stream()
+            .map(stream -> stream.openReader(readerConfig, Position.HEAD))
+            .collect(Collectors.toList());
+        List<Reader<byte[], GenericRecord>> readers = result(FutureUtils.collect(readerFutures));
+        log.info("Read thread started with : logs = {}",
+            streams.stream().map(stream -> stream.toString()).collect(Collectors.toList()));
+
+        final int numLogs = streams.size();
+        ReadEvents<byte[], GenericRecord> readEvents;
+        int backoffNum = 0;
+        while (true) {
+            for (int i = 0; i < numLogs; i++) {
+                readEvents = readers.get(i).readNext(flags.pollTimeoutMs, TimeUnit.MILLISECONDS);
+                if (null != readEvents) {
+                    final long receiveTime = System.currentTimeMillis();
+                    int num = readEvents.numEvents();
+                    int size = readEvents.getEstimatedSize();
+
+                    eventsRead.add(num);
+                    bytesRead.add(size);
+                    cumulativeEventsRead.add(num);
+                    cumulativeBytesRead.add(size);
+
+                    for (int j = 0; j < readEvents.numEvents(); j++) {
+                        ReadEvent readEvent = readEvents.next();
+                        long latencyMilli = receiveTime - readEvent.timestamp();
+                        try {
+                            recorder.recordValue(latencyMilli);
+                            cumulativeRecorder.recordValue(latencyMilli);
+                        } catch (ArrayIndexOutOfBoundsException oobe) {
+                            log.error("receiveTime is {}, readEvent.timestamp() is {}",
+                                receiveTime, readEvent.timestamp());
+                        }
+                    }
+                    // reset backoffNum
+                    backoffNum = 0;
+                } else if (flags.readEndless == 0) {
+                    if (backoffNum > flags.maxBackoffNum) {
+                        log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                        System.exit(-1);
+                    } else {
+                        backoffNum++;
+                    }
+                }
+            }
+        }
+    }
+
+    void readColumn(List<Stream<byte[], GenericRecord>> streams) throws Exception {
+        ArrayList<String> list = new ArrayList<String>(Arrays.asList(flags.readColumn.split(",")));
+        log.info("Columns to be read is:");
+        for (String column : list) {
+            log.info("{}", column);
+        }
+        ColumnReaderConfig readerConfig = ColumnReaderConfig.builder()
+            .columns(list)
+            .maxReadAheadCacheSize(flags.readAheadCatchSize).build();
+        List<CompletableFuture<ColumnReader<byte[], GenericRecord>>> readerFutures = streams.stream()
+            .map(stream -> stream.openColumnReader(readerConfig, Position.HEAD, Position.TAIL))
+            .collect(Collectors.toList());
+        List<ColumnVectors<byte[], GenericRecord>> columnVectorsList;
+        columnVectorsList = result(FutureUtils.collect(readerFutures)).stream()
+            .map(columnReader -> {
+                    try {
+                        return columnReader.readNextVector();
+                    } catch (StreamApiException sae) {
+                        log.error("Read column vector fail ", sae);
+                        return null;
+                    }
+                }
+            ).collect(Collectors.toList());
+
+        log.info("Read thread started with : logs = {}",
+            streams.stream().map(stream -> stream.toString()).collect(Collectors.toList()));
+
+        final int numLogs = streams.size();
+        ColumnVectors<byte[], GenericRecord> columnVectors;
+        int backoffNum = 0;
+        while (true) {
+            for (int i = 0; i < numLogs; i++) {
+                columnVectors = columnVectorsList.get(i);
+                if (null != columnVectors) {
+                    if (columnVectors.hasNext()) {
+                        ColumnVector columnVector = columnVectors.next(flags.pollTimeoutMs, TimeUnit.MILLISECONDS);
+                        if (null != columnVector) {
+                            int num = columnVector.num();
+                            int size = columnVector.estimatedSize();
+                            cumulativeEventsRead.add(num);
+                            cumulativeBytesRead.add(size);
+                            eventsRead.add(num);
+                            bytesRead.add(size);
+                            if (((EventPositionImpl) columnVector.position()).getRangeSeqNum() % 1000 == 0) {
+                                log.info("Column vector's stream is {}, end position is {} ",
+                                    columnVector.stream(), columnVector.position());
+                            }
+                            // reset backoffNum
+                            backoffNum = 0;
+                        } else if (flags.readEndless == 0) {
+                            if (backoffNum > flags.maxBackoffNum) {
+                                log.info("No more data after continurous {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                                System.exit(-1);
+                            } else {
+                                backoffNum++;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // read monitered through prometheus stats
+    void readWithPrometheusMonitor(List<Stream<byte[], GenericRecord>> streams) throws Exception {
         ReaderConfig readerConfig = ReaderConfig.builder()
             .maxReadAheadCacheSize(flags.readAheadCatchSize).build();
         List<CompletableFuture<Reader<byte[], GenericRecord>>> readerFutures = streams.stream()
@@ -381,7 +508,7 @@ public class CStreamReader extends ReaderBase {
         }
     }
 
-    void readColumn(List<Stream<byte[], GenericRecord>> streams) throws Exception {
+    void readColumnWithPrometheusMonitor(List<Stream<byte[], GenericRecord>> streams) throws Exception {
         ArrayList<String> list = new ArrayList<String>(Arrays.asList(flags.readColumn.split(",")));
         log.info("Columns to be read is:");
         for (String column : list) {

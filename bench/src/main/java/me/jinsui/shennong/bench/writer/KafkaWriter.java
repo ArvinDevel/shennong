@@ -107,26 +107,9 @@ public class KafkaWriter extends WriterBase {
     private final Flags flags;
     private final KafkaProducer<Long, byte[]> bytesProducer;
     private final byte[] payload;
-    private static Counter writtenEvents =
-        Counter.build()
-            .name("write_requests_finished_total")
-            .help("Total write requests.")
-            .register();
-    private static Counter writtenBytes =
-        Counter.build()
-            .name("write_bytes_finished_total")
-            .help("Total write bytes.")
-            .register();
-    private static Summary writtenLats =
-        Summary.build()
-            .quantile(0.5, 0.05)   // Add 50th percentile (= median) with 5% tolerated error
-            .quantile(0.75, 0.01)
-            .quantile(0.9, 0.01)   // Add 90th percentile with 1% tolerated error
-            .quantile(0.99, 0.001)
-            .quantile(0.999, 0.0001)
-            .name("request_duration_seconds")
-            .help("Total write latencies.")
-            .register();
+    private static Counter writtenEvents;
+    private static Counter writtenBytes;
+    private static Summary writtenLats;
 
     public KafkaWriter(Flags flags) {
         this.flags = flags;
@@ -147,6 +130,26 @@ public class KafkaWriter extends WriterBase {
         }
         if (flags.prometheusEnable) {
             startPrometheusServer(flags.prometheusPort);
+            writtenEvents =
+                Counter.build()
+                    .name("write_requests_finished_total")
+                    .help("Total write requests.")
+                    .register();
+            writtenBytes =
+                Counter.build()
+                    .name("write_bytes_finished_total")
+                    .help("Total write bytes.")
+                    .register();
+            writtenLats =
+                Summary.build()
+                    .quantile(0.5, 0.05)   // Add 50th percentile (= median) with 5% tolerated error
+                    .quantile(0.75, 0.01)
+                    .quantile(0.9, 0.01)   // Add 90th percentile with 1% tolerated error
+                    .quantile(0.99, 0.001)
+                    .quantile(0.999, 0.0001)
+                    .name("request_duration_seconds")
+                    .help("Total write latencies.")
+                    .register();
         }
     }
 
