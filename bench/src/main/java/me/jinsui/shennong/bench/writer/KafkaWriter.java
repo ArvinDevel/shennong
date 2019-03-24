@@ -212,10 +212,17 @@ public class KafkaWriter extends WriterBase {
                 final long numBytesForThisThread = flags.numBytes / flags.numThreads;
                 executor.submit(() -> {
                     try {
-                        write(
-                            logsThisThread,
-                            numRecordsForThisThread,
-                            numBytesForThisThread);
+                        if (flags.prometheusEnable) {
+                            writeWithPrometheusMonitor(
+                                logsThisThread,
+                                numRecordsForThisThread,
+                                numBytesForThisThread);
+                        } else {
+                            write(
+                                logsThisThread,
+                                numRecordsForThisThread,
+                                numBytesForThisThread);
+                        }
                     } catch (Exception e) {
                         log.error("Encountered error at writing records", e);
                         isDone.set(true);
@@ -240,7 +247,7 @@ public class KafkaWriter extends WriterBase {
 
         log.info("Write thread started with : logs = {},"
                 + " num records = {}, num bytes = {}",
-            streams.stream().map(l -> l).collect(Collectors.toList()),
+            streams.stream().collect(Collectors.toList()),
             numRecordsForThisThread,
             numBytesForThisThread);
         final DataSource<GenericRecord> dataSource;
@@ -302,6 +309,174 @@ public class KafkaWriter extends WriterBase {
                                             );
                                             recorder.recordValue(latencyMicros);
                                             cumulativeRecorder.recordValue(latencyMicros);
+                                        }
+                                    });
+                            }
+                        } else {
+                            GenericRecord msg = dataSource.getNext();
+                            if (0 != flags.bypass) {
+                                new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), msg);
+                                eventsWritten.increment();
+                                bytesWritten.add(eventSize);
+                                cumulativeEventsWritten.increment();
+                                cumulativeBytesWritten.add(eventSize);
+
+                                long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                    System.nanoTime() - sendTime
+                                );
+                                recorder.recordValue(latencyMicros);
+                                cumulativeRecorder.recordValue(latencyMicros);
+                            } else {
+                                producer.send(new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), msg),
+                                    (metadata, exception) -> {
+                                        if (null != exception) {
+                                            log.error("Write fail", exception);
+                                            isDone.set(true);
+                                            System.exit(-1);
+                                        } else {
+                                            eventsWritten.increment();
+                                            bytesWritten.add(eventSize);
+                                            cumulativeEventsWritten.increment();
+                                            cumulativeBytesWritten.add(eventSize);
+
+                                            long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                                System.nanoTime() - sendTime
+                                            );
+                                            recorder.recordValue(latencyMicros);
+                                            cumulativeRecorder.recordValue(latencyMicros);
+                                        }
+                                    });
+                            }
+                        }
+                    } catch (final SerializationException se) {
+                        log.error("Serialize msg fail ", se);
+                        isDone.set(true);
+                        System.exit(-1);
+                    }
+                } else {
+                    if (null != flags.tableName) {
+                        switch (flags.tableName) {
+                            case "orders":
+                                if (!((TpchDataSourceFactory.OrdersDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "customer":
+                                if (!((TpchDataSourceFactory.CustomerDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "lineitem":
+                                if (!((TpchDataSourceFactory.LineitemDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "part":
+                                if (!((TpchDataSourceFactory.PartDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "partsupp":
+                                if (!((TpchDataSourceFactory.PartsuppDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            case "supplier":
+                                if (!((TpchDataSourceFactory.SupplierDataSource) dataSource).getIterator().hasNext()) {
+                                    log.info("Generated orders Tale data were finished, existing...");
+                                    markPerfDone();
+                                }
+                                break;
+                            default:
+                                log.error("Shouldn't come to here!");
+                                System.exit(-1);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void writeWithPrometheusMonitor(List<String> streams,
+                                            long numRecordsForThisThread,
+                                            long numBytesForThisThread) throws Exception {
+
+        log.info("Write thread started with : logs = {},"
+                + " num records = {}, num bytes = {}",
+            streams.stream().collect(Collectors.toList()),
+            numRecordsForThisThread,
+            numBytesForThisThread);
+        final DataSource<GenericRecord> dataSource;
+        if (null != flags.tableName) {
+            dataSource = TpchDataSourceFactory.getTblDataSource(flags.writeRate, flags.tableName, flags.scaleFactor);
+        } else {
+            dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
+        }
+
+        // one thread use one dedicated producer to avoid shared resource contention
+        KafkaProducer<Long, GenericRecord> producer = new KafkaProducer<>(newKafkaProperties(flags));
+        long totalWritten = 0L;
+        long totalBytesWritten = 0L;
+        int eventSize = dataSource.getEventSize();
+        final int numStream = streams.size();
+        while (true) {
+            for (int i = 0; i < numStream; i++) {
+                if (numRecordsForThisThread > 0
+                    && totalWritten >= numRecordsForThisThread) {
+                    markPerfDone();
+                }
+                if (numBytesForThisThread > 0
+                    && totalBytesWritten >= numBytesForThisThread) {
+                    markPerfDone();
+                }
+                totalWritten++;
+                totalBytesWritten += eventSize;
+                if (dataSource.hasNext()) {
+                    final long sendTime = System.nanoTime();
+                    try {
+                        if (flags.valueType > 0) {
+                            if (0 != flags.bypass) {
+                                new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), payload);
+                                eventsWritten.increment();
+                                bytesWritten.add(flags.valueSize);
+                                cumulativeEventsWritten.increment();
+                                cumulativeBytesWritten.add(flags.valueSize);
+
+                                long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                    System.nanoTime() - sendTime
+                                );
+                                recorder.recordValue(latencyMicros);
+                                cumulativeRecorder.recordValue(latencyMicros);
+
+                                // prometheus
+                                writtenBytes.inc();
+                                writtenEvents.inc(eventSize);
+                            } else {
+                                bytesProducer.send(new ProducerRecord<>(streams.get(i), System.currentTimeMillis(), payload),
+                                    (metadata, exception) -> {
+                                        if (null != exception) {
+                                            log.error("Write fail", exception);
+                                            isDone.set(true);
+                                            System.exit(-1);
+                                        } else {
+                                            eventsWritten.increment();
+                                            bytesWritten.add(flags.valueSize);
+                                            cumulativeEventsWritten.increment();
+                                            cumulativeBytesWritten.add(flags.valueSize);
+
+                                            long latencyMicros = TimeUnit.NANOSECONDS.toMicros(
+                                                System.nanoTime() - sendTime
+                                            );
+                                            recorder.recordValue(latencyMicros);
+                                            cumulativeRecorder.recordValue(latencyMicros);
+                                            // prometheus
+                                            writtenBytes.inc();
+                                            writtenEvents.inc(eventSize);
                                         }
                                     });
                             }
