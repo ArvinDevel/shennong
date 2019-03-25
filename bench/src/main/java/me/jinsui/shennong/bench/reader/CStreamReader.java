@@ -18,6 +18,8 @@ import static org.apache.bookkeeper.common.concurrent.FutureUtils.result;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Iterables;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Summary;
 import java.io.File;
@@ -390,7 +392,9 @@ public class CStreamReader extends ReaderBase {
     }
 
     void readColumn(List<Stream<byte[], GenericRecord>> streams) throws Exception {
-        ArrayList<String> list = new ArrayList<String>(Arrays.asList(flags.readColumn.split(",")));
+        String[] readFields =
+            Iterables.toArray(Splitter.on(",").omitEmptyStrings().split(flags.readColumn), String.class);
+        ArrayList<String> list = new ArrayList<>(Arrays.asList(readFields));
         log.info("Columns to be read is:");
         for (String column : list) {
             log.info("{}", column);
@@ -509,7 +513,9 @@ public class CStreamReader extends ReaderBase {
     }
 
     void readColumnWithPrometheusMonitor(List<Stream<byte[], GenericRecord>> streams) throws Exception {
-        ArrayList<String> list = new ArrayList<String>(Arrays.asList(flags.readColumn.split(",")));
+        String[] readFields =
+            Iterables.toArray(Splitter.on(",").omitEmptyStrings().split(flags.readColumn), String.class);
+        ArrayList<String> list = new ArrayList<String>(Arrays.asList(readFields));
         log.info("Columns to be read is:");
         for (String column : list) {
             log.info("{}", column);

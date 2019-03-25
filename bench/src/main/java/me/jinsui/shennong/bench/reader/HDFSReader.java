@@ -17,6 +17,8 @@ package me.jinsui.shennong.bench.reader;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Iterables;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Summary;
 import java.io.IOException;
@@ -206,7 +208,8 @@ public class HDFSReader extends ReaderBase {
                         break;
                 }
             }
-            String[] cols = flags.readColumn.split(",");
+            String[] cols =
+                Iterables.toArray(Splitter.on(",").omitEmptyStrings().split(flags.readColumn), String.class);
             ArrayList<Schema.Field> readFields = new ArrayList<>();
             List<Schema.Field> writeFields = writeSchema.getFields();
 

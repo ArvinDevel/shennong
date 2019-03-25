@@ -331,7 +331,8 @@ public class KafkaReader extends ReaderBase {
 
             }
         }
-        String[] readFields = flags.readColumn.split(",", -1);
+        String[] readFields =
+            Iterables.toArray(Splitter.on(",").omitEmptyStrings().split(flags.readColumn), String.class);
         boolean checkColumn = true;
         if (readFields.length < 1) {
             checkColumn = false;
