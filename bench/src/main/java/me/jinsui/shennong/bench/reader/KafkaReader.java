@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
@@ -132,6 +133,13 @@ public class KafkaReader extends ReaderBase {
             },
             description = "Tpch table name, Shall specify correct deserialization util when using tpch data")
         public String tableName = null;
+
+        @Parameter(
+            names = {
+                "-gid", "--group-id"
+            },
+            description = "Setting this to coordinate consuming using a consumer group, default using seperated group")
+        public String groupId = null;
 
     }
 
@@ -383,6 +391,11 @@ public class KafkaReader extends ReaderBase {
         props.put("group.id", topicName);
         props.put("enable.auto.commit", "true");
         props.put("auto.commit.interval.ms", "1000");
+        if (null != flags.groupId) {
+            props.put(ConsumerConfig.GROUP_ID_CONFIG, flags.groupId);
+        } else {
+            props.put(ConsumerConfig.GROUP_ID_CONFIG, UUID.randomUUID().toString());
+        }
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, LongDeserializer.class);
         if (null != flags.tableName) {
             switch (flags.tableName) {
