@@ -1,22 +1,18 @@
 package me.jinsui.shennong.bench.utils;
 
-import java.io.File;
-import me.jinsui.shennong.bench.avro.User;
-import org.apache.avro.Schema;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.Map;
+import me.jinsui.shennong.bench.avro.Customer;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
-import org.apache.avro.Schema.Parser;
 import org.apache.avro.specific.SpecificDatumReader;
 import org.apache.avro.specific.SpecificRecordBase;
 import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.serialization.Deserializer;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.Map;
-
-public class AvroDeserializer<T extends SpecificRecordBase> implements Deserializer<T> {
+public class CustomerDeserializer<T extends SpecificRecordBase> implements Deserializer<T> {
 
     @Override
     public void configure(Map<String, ?> configs, boolean isKey) {
@@ -25,7 +21,7 @@ public class AvroDeserializer<T extends SpecificRecordBase> implements Deseriali
     @Override
     public T deserialize(String topic, byte[] data) {
         try {
-            DatumReader<T> userDatumReader = new SpecificDatumReader<>(User.getClassSchema());
+            DatumReader<T> userDatumReader = new SpecificDatumReader<>(Customer.getClassSchema());
             BinaryDecoder binaryEncoder = DecoderFactory.get().directBinaryDecoder(new ByteArrayInputStream(data), null);
             return userDatumReader.read(null, binaryEncoder);
         } catch (IOException ioe) {

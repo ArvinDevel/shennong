@@ -17,19 +17,24 @@ package me.jinsui.shennong.bench.reader;
 import com.beust.jcommander.Parameter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Iterables;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Summary;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import me.jinsui.shennong.bench.utils.AvroDeserializer;
+import me.jinsui.shennong.bench.utils.LineitemDeserializer;
+import me.jinsui.shennong.bench.utils.UserDeserializer;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.lang3.tuple.Pair;
@@ -62,7 +67,7 @@ public class KafkaReader extends ReaderBase {
             names = {
                 "-cp", "--consume-position"
             },
-            description = "Consume position, default 0 earliest, -1 latest, others means specified offset")
+            description = "Consume position, default 0 earliest, -1 latest, others means random choose one offset between earliest and latest")
         public long consumePosition = 0;
 
         @Parameter(
@@ -76,8 +81,8 @@ public class KafkaReader extends ReaderBase {
             names = {
                 "-rc", "--read-column"
             },
-            description = "Columns to be read(column stream mode), default value is for default avro schema")
-        public String readColumn = "age";
+            description = "Columns to be read(column stream mode), default value is empty, not check for columns")
+        public String readColumn = "";
 
         @Parameter(
             names = {
@@ -120,6 +125,13 @@ public class KafkaReader extends ReaderBase {
             },
             description = "Max backoff number")
         public int maxBackoffNum = -1;
+
+        @Parameter(
+            names = {
+                "-ttn", "--tpch-table-name"
+            },
+            description = "Tpch table name, Shall specify correct deserialization util when using tpch data")
+        public String tableName = null;
 
     }
 
@@ -192,9 +204,13 @@ public class KafkaReader extends ReaderBase {
                     .collect(Collectors.toList());
                 executor.submit(() -> {
                     try {
-                        read(consumersThisThread);
+                        if (flags.prometheusEnable) {
+                            readWithPrometheusMonitor(consumersThisThread);
+                        } else {
+                            read(consumersThisThread);
+                        }
                     } catch (Exception e) {
-                        log.error("Encountered error at writing records", e);
+                        log.error("Encountered error at reading records", e);
                         isDone.set(true);
                         System.exit(-1);
                     }
@@ -216,23 +232,41 @@ public class KafkaReader extends ReaderBase {
     private void read(List<KafkaConsumer> consumersInThisThread) {
         log.info("Read thread started with : topics = {}", consumersInThisThread);
 
-        // set consume position to head compulsively to avoid can't read from head again after read once
-        if (flags.consumePosition != -1) {
-            for (KafkaConsumer consumer : consumersInThisThread) {
-                // to get assignment of the consumer
-                consumer.poll(flags.pollTimeoutMs);
-                log.info("consumer {} has partitions {} ", consumer, consumer.assignment());
-                // seek to head
-                if (flags.consumePosition == 0) {
-                    consumer.seekToBeginning(consumer.assignment());
-                } else {
-                    for (TopicPartition topicPartition : (Set<TopicPartition>) consumer.assignment()) {
-                        consumer.seek(topicPartition, flags.consumePosition);
-                    }
+        for (KafkaConsumer consumer : consumersInThisThread) {
+            // to get assignment of the consumer
+            consumer.poll(flags.pollTimeoutMs);
+            log.info("consumer {} has partitions {} ", consumer, consumer.assignment());
+            // seek to head
+            if (flags.consumePosition == 0) {
+                log.info("begin set position to begin");
+                consumer.seekToBeginning(consumer.assignment());
+                // read from latest
+            } else if (flags.consumePosition == -1) {
+                log.info("begin set position to end");
+                consumer.seekToEnd(consumer.assignment());
+            } else {
+                Map<TopicPartition, Long> beginningOffsets = consumer.beginningOffsets(consumer.assignment());
+                Map<TopicPartition, Long> endOffsets = consumer.endOffsets(consumer.assignment());
+                for (TopicPartition topicPartition : (Set<TopicPartition>) consumer.assignment()) {
+                    long begin = beginningOffsets.get(topicPartition);
+                    long end = endOffsets.get(topicPartition);
+                    long offset = ThreadLocalRandom.current().nextLong(begin, end);
+                    consumer.seek(topicPartition, offset);
+                    log.info("seek topic partition {} offset to {}, begin is {}, end is {}",
+                        topicPartition, offset, begin, end);
                 }
+
             }
         }
-        String[] readFields = flags.readColumn.split(",");
+
+        String[] readFields =
+            Iterables.toArray(Splitter.on(",").omitEmptyStrings().split(flags.readColumn), String.class);
+        boolean checkColumn = true;
+        if (readFields.length < 1) {
+            checkColumn = false;
+        } else {
+            log.info("Columns to be read are {} ", readFields);
+        }
         int backoffNum = 0;
         while (true) {
             for (KafkaConsumer consumer : consumersInThisThread) {
@@ -253,11 +287,13 @@ public class KafkaReader extends ReaderBase {
                 cumulativeEventsRead.add(num);
                 // filter according to read column
                 for (ConsumerRecord<Long, GenericRecord> record : records) {
-                    for (String field : readFields) {
-                        Object data = record.value().get(field);
+                    if (checkColumn) {
+                        for (String field : readFields) {
+                            Object data = record.value().get(field);
+                        }
                     }
                     // TODO how to estimate field value size
-                    int size = record.serializedValueSize();
+                    int size = record.serializedValueSize() + record.serializedKeySize();
                     bytesRead.add(size);
                     cumulativeBytesRead.add(size);
                 }
@@ -269,22 +305,39 @@ public class KafkaReader extends ReaderBase {
         log.info("Read thread started with : topics = {}", consumersInThisThread);
 
         // set consume position to head compulsively to avoid can't read from head again after read once
-        if (flags.consumePosition != -1) {
-            for (KafkaConsumer consumer : consumersInThisThread) {
-                // to get assignment of the consumer
-                consumer.poll(flags.pollTimeoutMs);
-                log.info("consumer {} has partitions {} ", consumer, consumer.assignment());
-                // seek to head
-                if (flags.consumePosition == 0) {
-                    consumer.seekToBeginning(consumer.assignment());
-                } else {
-                    for (TopicPartition topicPartition : (Set<TopicPartition>) consumer.assignment()) {
-                        consumer.seek(topicPartition, flags.consumePosition);
-                    }
+        for (KafkaConsumer consumer : consumersInThisThread) {
+            // to get assignment of the consumer
+            consumer.poll(flags.pollTimeoutMs);
+            log.info("consumer {} has partitions {} ", consumer, consumer.assignment());
+            // seek to head
+            if (flags.consumePosition == 0) {
+                log.info("begin set position to begin");
+                consumer.seekToBeginning(consumer.assignment());
+                // read from latest
+            } else if (flags.consumePosition == -1) {
+                log.info("begin set position to end");
+                consumer.seekToEnd(consumer.assignment());
+            } else {
+                Map<TopicPartition, Long> beginningOffsets = consumer.beginningOffsets(consumer.assignment());
+                Map<TopicPartition, Long> endOffsets = consumer.endOffsets(consumer.assignment());
+                for (TopicPartition topicPartition : (Set<TopicPartition>) consumer.assignment()) {
+                    long begin = beginningOffsets.get(topicPartition);
+                    long end = endOffsets.get(topicPartition);
+                    long offset = ThreadLocalRandom.current().nextLong(begin, end);
+                    consumer.seek(topicPartition, offset);
+                    log.info("seek topic partition {} offset to {}, begin is {}, end is {}",
+                        topicPartition, offset, begin, end);
                 }
+
             }
         }
-        String[] readFields = flags.readColumn.split(",");
+        String[] readFields = flags.readColumn.split(",", -1);
+        boolean checkColumn = true;
+        if (readFields.length < 1) {
+            checkColumn = false;
+        } else {
+            log.info("Columns to be read are {} ", readFields);
+        }
         int backoffNum = 0;
         while (true) {
             for (KafkaConsumer consumer : consumersInThisThread) {
@@ -308,11 +361,13 @@ public class KafkaReader extends ReaderBase {
                 readEventsForPrometheus.inc(num);
                 // filter according to read column
                 for (ConsumerRecord<Long, GenericRecord> record : records) {
-                    for (String field : readFields) {
-                        Object data = record.value().get(field);
-                    }
                     // TODO how to estimate field value size
-                    int size = record.serializedValueSize();
+                    if (checkColumn) {
+                        for (String field : readFields) {
+                            Object data = record.value().get(field);
+                        }
+                    }
+                    int size = record.serializedValueSize() + record.serializedKeySize();
                     bytesRead.add(size);
                     cumulativeBytesRead.add(size);
                     readBytes.inc(size);
@@ -328,7 +383,37 @@ public class KafkaReader extends ReaderBase {
         props.put("enable.auto.commit", "true");
         props.put("auto.commit.interval.ms", "1000");
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, LongDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, AvroDeserializer.class);
+        if (null != flags.tableName) {
+            switch (flags.tableName) {
+                case "orders":
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
+                    break;
+                case "customer":
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
+                    break;
+                case "lineitem":
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, LineitemDeserializer.class);
+                    break;
+                case "part":
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
+
+                    break;
+                case "partsupp":
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
+
+                    break;
+                case "supplier":
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
+
+                    break;
+                default:
+                    log.error("Wrong tpch tbl name {} !", flags.tableName);
+                    System.exit(-1);
+            }
+        } else {
+            // custom user schema
+            props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
+        }
         if (flags.consumePosition == 0) {
             props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         }
