@@ -432,7 +432,6 @@ public class CStreamWriter extends WriterBase {
                                 .build());
                         eventFuture.thenAccept(writeResult -> {
 
-                            writtenEvents.inc();
                             eventsWritten.increment();
                             bytesWritten.add(eventSize);
                             cumulativeEventsWritten.increment();
