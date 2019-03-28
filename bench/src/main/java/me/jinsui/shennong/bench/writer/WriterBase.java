@@ -13,10 +13,10 @@ import org.HdrHistogram.Recorder;
 public abstract class WriterBase extends BenchBase {
     final AtomicBoolean isDone = new AtomicBoolean(false);
     final Recorder recorder = new Recorder(
-        TimeUnit.SECONDS.toMillis(120000), 5
+        TimeUnit.SECONDS.toMicros(120000), 5
     );
     final Recorder cumulativeRecorder = new Recorder(
-        TimeUnit.SECONDS.toMillis(120000), 5
+        TimeUnit.SECONDS.toMicros(120000), 5
     );
 
     // stats
