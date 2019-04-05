@@ -436,10 +436,6 @@ public class CStreamReader extends ReaderBase {
                             cumulativeBytesRead.add(size);
                             eventsRead.add(num);
                             bytesRead.add(size);
-                            if (((EventPositionImpl) columnVector.position()).getRangeSeqNum() % 1000 == 0) {
-                                log.info("Column vector's stream is {}, end position is {} ",
-                                    columnVector.stream(), columnVector.position());
-                            }
                             // reset backoffNum
                             backoffNum = 0;
                         } else if (flags.readEndless == 0) {
