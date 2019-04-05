@@ -298,7 +298,6 @@ public class HDFSReader extends ReaderBase {
         int backoffNum = 0;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
-                Summary.Timer requestTimer = readLats.startTimer();
                 readData = readers.get(i).read();
                 if (null != readData) {
                     eventsRead.increment();
