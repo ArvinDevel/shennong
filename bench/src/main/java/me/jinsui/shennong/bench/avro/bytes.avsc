@@ -1,0 +1,8 @@
+{
+  "namespace": "me.jinsui.shennong.bench.avro",
+  "type": "record",
+  "name": "Binaries",
+  "fields": [
+    {"name": "bin", "type": "bytes"}
+  ]
+}
