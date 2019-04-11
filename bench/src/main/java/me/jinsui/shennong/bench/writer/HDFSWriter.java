@@ -20,6 +20,7 @@ import me.jinsui.shennong.bench.avro.Partsupp;
 import me.jinsui.shennong.bench.avro.Supplier;
 import me.jinsui.shennong.bench.avro.User;
 import me.jinsui.shennong.bench.source.AvroDataSource;
+import me.jinsui.shennong.bench.source.CustomDataSource;
 import me.jinsui.shennong.bench.source.DataSource;
 import me.jinsui.shennong.bench.source.TpchDataSourceFactory;
 import me.jinsui.shennong.bench.utils.CliFlags;
@@ -51,13 +52,6 @@ public class HDFSWriter extends WriterBase {
             },
             description = "HDFS cluster namenode url")
         public String url = "hdfs://localhost:9000";
-
-        @Parameter(
-            names = {
-                "-sf", "--schema-file"
-            },
-            description = "Schema represented as Avro, used in complex mode")
-        public String schemaFile = null;
 
         @Parameter(
             names = {
@@ -204,6 +198,8 @@ public class HDFSWriter extends WriterBase {
                         System.exit(-1);
                         log.error("{} is Not standard tpch table", flags.tableName);
                 }
+            } else if (null != flags.schemaFile) {
+                writerSchema = new CustomDataSource(1, flags.schemaFile, 1).getSchema();
             } else {
                 writerSchema = User.getClassSchema();
             }
@@ -286,6 +282,8 @@ public class HDFSWriter extends WriterBase {
         DataSource<GenericRecord> dataSource;
         if (null != flags.tableName) {
             dataSource = TpchDataSourceFactory.getTblDataSource(writeRate, flags.tableName, flags.scaleFactor);
+        } else if (null != flags.schemaFile) {
+            dataSource = new CustomDataSource(writeRate, flags.schemaFile, flags.bytesSize);
         } else {
             dataSource = new AvroDataSource(writeRate, flags.schemaFile);
         }
@@ -397,6 +395,8 @@ public class HDFSWriter extends WriterBase {
         DataSource<GenericRecord> dataSource;
         if (null != flags.tableName) {
             dataSource = TpchDataSourceFactory.getTblDataSource(writeRate, flags.tableName, flags.scaleFactor);
+        } else if (null != flags.schemaFile) {
+            dataSource = new CustomDataSource(writeRate, flags.schemaFile, flags.bytesSize);
         } else {
             dataSource = new AvroDataSource(writeRate, flags.schemaFile);
         }

@@ -82,4 +82,18 @@ public class CliFlags {
         description = "Prometheus server port to monitor bench performance. Default 5080")
     public int prometheusPort = 5080;
 
+    @Parameter(
+        names = {
+            "-sf", "--schema-file"
+        },
+        description = "Schema represented as Avro, use absolute path")
+    public String schemaFile = null;
+
+    @Parameter(
+        names = {
+            "-bytessize", "--bytes-size"
+        },
+        description = "Bytes field size in custom avro record, default 10")
+    public int bytesSize = 10;
+
 }

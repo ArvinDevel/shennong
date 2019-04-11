@@ -27,6 +27,7 @@ import me.jinsui.shennong.bench.avro.Partsupp;
 import me.jinsui.shennong.bench.avro.Supplier;
 import me.jinsui.shennong.bench.avro.User;
 import me.jinsui.shennong.bench.source.AvroDataSource;
+import me.jinsui.shennong.bench.source.CustomDataSource;
 import me.jinsui.shennong.bench.source.DataSource;
 import me.jinsui.shennong.bench.source.TpchDataSourceFactory;
 import me.jinsui.shennong.bench.utils.CliFlags;
@@ -77,13 +78,6 @@ public class CStreamWriter extends WriterBase {
             },
             description = "CStream cluster url")
         public String url = "bk://localhost:4181";
-
-        @Parameter(
-            names = {
-                "-sf", "--schema-file"
-            },
-            description = "Schema represented as Avro, used in complex mode")
-        public String schemaFile = null;
 
         @Parameter(
             names = {
@@ -271,7 +265,12 @@ public class CStreamWriter extends WriterBase {
                         log.error("{} is Not standard tpch table", flags.tableName);
                 }
             } else {
-                valueTypedSchema = TypedSchemas.avroSchema(User.getClassSchema());
+                if (null != flags.schemaFile) {
+                    valueTypedSchema = TypedSchemas.avroSchema(
+                        new CustomDataSource(1, flags.schemaFile, 1).getSchema());
+                } else {
+                    valueTypedSchema = TypedSchemas.avroSchema(User.getClassSchema());
+                }
             }
             StreamConfig<byte[], GenericRecord> streamConfig = StreamConfig.<byte[], GenericRecord>builder()
                 .schema(StreamSchemaBuilder.<byte[], GenericRecord>builder()
@@ -373,6 +372,8 @@ public class CStreamWriter extends WriterBase {
         DataSource<GenericRecord> dataSource;
         if (null != flags.tableName) {
             dataSource = TpchDataSourceFactory.getTblDataSource(writeRate, flags.tableName, flags.scaleFactor);
+        } else if (null != flags.schemaFile) {
+            dataSource = new CustomDataSource(writeRate, flags.schemaFile, flags.bytesSize);
         } else {
             dataSource = new AvroDataSource(writeRate, flags.schemaFile);
         }
@@ -514,6 +515,8 @@ public class CStreamWriter extends WriterBase {
         DataSource<GenericRecord> dataSource;
         if (null != flags.tableName) {
             dataSource = TpchDataSourceFactory.getTblDataSource(writeRate, flags.tableName, flags.scaleFactor);
+        } else if (null != flags.schemaFile) {
+            dataSource = new CustomDataSource(writeRate, flags.schemaFile, flags.bytesSize);
         } else {
             dataSource = new AvroDataSource(writeRate, flags.schemaFile);
         }
@@ -678,7 +681,11 @@ public class CStreamWriter extends WriterBase {
                     log.error("{} is Not standard tpch table", flags.tableName);
             }
         } else {
-            schema = Schemas.serializeSchema(User.getClassSchema());
+            if (null != flags.schemaFile) {
+                schema = Schemas.serializeSchema(new CustomDataSource(1, flags.schemaFile, 1).getSchema());
+            } else {
+                schema = Schemas.serializeSchema(User.getClassSchema());
+            }
         }
         StreamSchemaInfo streamSchemaInfo = StreamSchemaInfo.newBuilder()
             .setKeySchema(SchemaInfo.newBuilder()
