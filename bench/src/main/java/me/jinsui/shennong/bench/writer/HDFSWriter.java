@@ -86,7 +86,7 @@ public class HDFSWriter extends WriterBase {
                 "-rs", "--replica-size"
             },
             description = "Number of replica of the file")
-        public short replicaSize = 3;
+        public int replicaSize = 3;
 
         @Parameter(
             names = {
@@ -170,7 +170,7 @@ public class HDFSWriter extends WriterBase {
             }
             Path path = new Path(flags.directory + fileName);
             if (!dfs.exists(path)) {
-                dfs.create(path, flags.replicaSize);
+                dfs.create(path, (short) flags.replicaSize);
             }
             Schema writerSchema;
             if (null != flags.tableName) {
