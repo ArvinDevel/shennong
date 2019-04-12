@@ -71,12 +71,6 @@ public class KafkaReader extends ReaderBase {
             description = "Consume position, default 0 earliest, -1 latest, others means random choose one offset between earliest and latest")
         public long consumePosition = 0;
 
-        @Parameter(
-            names = {
-                "-sf", "--schema-file"
-            },
-            description = "Schema represented using Avro, used in complex mode")
-        public String schemaFile = null;
 
         @Parameter(
             names = {

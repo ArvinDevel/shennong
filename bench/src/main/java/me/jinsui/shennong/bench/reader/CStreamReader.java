@@ -98,13 +98,6 @@ public class CStreamReader extends ReaderBase {
 
         @Parameter(
             names = {
-                "-sf", "--schema-file"
-            },
-            description = "Schema represented using Avro, used in complex mode")
-        public String schemaFile = null;
-
-        @Parameter(
-            names = {
                 "-pf", "--position-file"
             },
             description = "Local file to store start position of stream")

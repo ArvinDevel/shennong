@@ -69,13 +69,6 @@ public class HDFSReader extends ReaderBase {
 
         @Parameter(
             names = {
-                "-sf", "--schema-file"
-            },
-            description = "Schema represented using Avro, used in complex mode")
-        public String schemaFile = null;
-
-        @Parameter(
-            names = {
                 "-rc", "--read-column"
             },
             description = "Columns to be read(column stream mode), default value is for default avro schema")
