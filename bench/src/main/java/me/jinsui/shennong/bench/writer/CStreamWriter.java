@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.protobuf.ByteString;
 import io.prometheus.client.Counter;
-import io.prometheus.client.Histogram;
 import io.prometheus.client.Summary;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -375,7 +374,7 @@ public class CStreamWriter extends WriterBase {
         } else if (null != flags.schemaFile) {
             dataSource = new CustomDataSource(writeRate, flags.schemaFile, flags.bytesSize);
         } else {
-            dataSource = new AvroDataSource(writeRate, flags.schemaFile);
+            dataSource = new AvroDataSource(writeRate);
         }
 
         log.info("Write thread started with : logs = {}, rate = {},"
@@ -518,7 +517,7 @@ public class CStreamWriter extends WriterBase {
         } else if (null != flags.schemaFile) {
             dataSource = new CustomDataSource(writeRate, flags.schemaFile, flags.bytesSize);
         } else {
-            dataSource = new AvroDataSource(writeRate, flags.schemaFile);
+            dataSource = new AvroDataSource(writeRate);
         }
 
         log.info("Write thread started with : logs = {}, rate = {},"

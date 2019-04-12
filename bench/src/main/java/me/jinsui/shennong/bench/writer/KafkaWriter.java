@@ -250,7 +250,7 @@ public class KafkaWriter extends WriterBase {
         } else if (null != flags.schemaFile) {
             dataSource = new CustomDataSource(flags.writeRate, flags.schemaFile, flags.bytesSize);
         } else {
-            dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
+            dataSource = new AvroDataSource(flags.writeRate);
         }
 
         // one thread use one dedicated producer to avoid shared resource contention
@@ -413,7 +413,7 @@ public class KafkaWriter extends WriterBase {
         } else if (null != flags.schemaFile) {
             dataSource = new CustomDataSource(flags.writeRate, flags.schemaFile, flags.bytesSize);
         } else {
-            dataSource = new AvroDataSource(flags.writeRate, flags.schemaFile);
+            dataSource = new AvroDataSource(flags.writeRate);
         }
 
         // one thread use one dedicated producer to avoid shared resource contention

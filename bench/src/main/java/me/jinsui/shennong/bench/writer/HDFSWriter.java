@@ -285,7 +285,7 @@ public class HDFSWriter extends WriterBase {
         } else if (null != flags.schemaFile) {
             dataSource = new CustomDataSource(writeRate, flags.schemaFile, flags.bytesSize);
         } else {
-            dataSource = new AvroDataSource(writeRate, flags.schemaFile);
+            dataSource = new AvroDataSource(writeRate);
         }
 
         log.info("Write thread started with : logs = {},"
@@ -398,7 +398,7 @@ public class HDFSWriter extends WriterBase {
         } else if (null != flags.schemaFile) {
             dataSource = new CustomDataSource(writeRate, flags.schemaFile, flags.bytesSize);
         } else {
-            dataSource = new AvroDataSource(writeRate, flags.schemaFile);
+            dataSource = new AvroDataSource(writeRate);
         }
 
         log.info("Write thread started with : logs = {},"

@@ -11,14 +11,12 @@ import org.apache.avro.generic.GenericRecord;
 @Slf4j
 public class AvroDataSource implements DataSource<GenericRecord> {
     private final RateLimiter rateLimiter;
-    private final String schemaFile;
     private final String mockStr = "mockName";
     private final int msgSize;
     private final User mockUser;
 
-    public AvroDataSource(double rate, String schemaFile) {
+    public AvroDataSource(double rate) {
         this.rateLimiter = RateLimiter.create(rate);
-        this.schemaFile = schemaFile;
         this.msgSize = estimateMsgSize();
         this.mockUser = getMockUser();
     }
