@@ -45,7 +45,7 @@ public class CustomDataSource implements DataSource<GenericRecord> {
             System.exit(-1);
             return null;
         }
-        log.error("schema is {}", schema);
+        log.info("schema is {}", schema);
         GenericRecord customRecord = new GenericData.Record(schema);
         for (Schema.Field field : schema.getFields()) {
             switch (field.schema().getType()) {
