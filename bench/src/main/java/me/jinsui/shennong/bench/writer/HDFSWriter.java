@@ -224,6 +224,18 @@ public class HDFSWriter extends WriterBase {
         // register shutdown hook to aggregate stats
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             isDone.set(true);
+            // close to avoid parquet info not written
+            fileWriters
+                .stream()
+                .map(pair -> {
+                    try {
+                        pair.getRight().close();
+                    } catch (Exception e) {
+                        // Note that: once this occur, the parquet file can' tbe recognized, so it's better specify event num/bytes to write!
+                        log.error("fail to close writer", e);
+                    }
+                    return null;
+                });
             printAggregatedStats(cumulativeRecorder);
         }));
 

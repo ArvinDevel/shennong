@@ -36,6 +36,7 @@ import me.jinsui.shennong.bench.avro.Part;
 import me.jinsui.shennong.bench.avro.Partsupp;
 import me.jinsui.shennong.bench.avro.Supplier;
 import me.jinsui.shennong.bench.avro.User;
+import me.jinsui.shennong.bench.source.CustomDataSource;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
@@ -177,8 +178,12 @@ public class HDFSReader extends ReaderBase {
                 System.exit(-1);
             }
             dfs.open(path);
-
-            Schema writeSchema = User.getClassSchema();
+            Schema writeSchema;
+            if (null != flags.schemaFile) {
+                writeSchema = new CustomDataSource(1, flags.schemaFile, 1).getSchema();
+            } else {
+                writeSchema = User.getClassSchema();
+            }
             if (null != flags.tableName) {
                 switch (flags.tableName) {
                     case "orders":
