@@ -21,6 +21,10 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Summary;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,7 +38,13 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import me.jinsui.shennong.bench.utils.CustomSchemaDeserializer;
+import me.jinsui.shennong.bench.utils.CustomerDeserializer;
 import me.jinsui.shennong.bench.utils.LineitemDeserializer;
+import me.jinsui.shennong.bench.utils.OrdersDeserializer;
+import me.jinsui.shennong.bench.utils.PartDeserializer;
+import me.jinsui.shennong.bench.utils.PartsuppDeserializer;
+import me.jinsui.shennong.bench.utils.SupplierDeserializer;
 import me.jinsui.shennong.bench.utils.UserDeserializer;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.generic.GenericRecord;
@@ -138,6 +148,7 @@ public class KafkaReader extends ReaderBase {
     }
 
     protected final Flags flags;
+    private final String schemaPath = "schemaForKafka";
 
     public KafkaReader(Flags flags) {
         this.flags = flags;
@@ -158,6 +169,21 @@ public class KafkaReader extends ReaderBase {
                     .name("request_duration_seconds")
                     .help("Total read latencies.")
                     .register();
+        }
+        if (null != flags.schemaFile) {
+            try {
+                FileOutputStream fos;
+                BufferedOutputStream bos;
+                fos = new FileOutputStream(schemaPath);
+                bos = new BufferedOutputStream(fos);
+                byte[] data = flags.schemaFile.getBytes();
+                bos.write(data, 0, data.length);
+                bos.flush();
+                bos.close();
+                fos.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -394,30 +420,29 @@ public class KafkaReader extends ReaderBase {
         if (null != flags.tableName) {
             switch (flags.tableName) {
                 case "orders":
-                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, OrdersDeserializer.class);
                     break;
                 case "customer":
-                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, CustomerDeserializer.class);
                     break;
                 case "lineitem":
                     props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, LineitemDeserializer.class);
                     break;
                 case "part":
-                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
-
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, PartDeserializer.class);
                     break;
                 case "partsupp":
-                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
-
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, PartsuppDeserializer.class);
                     break;
                 case "supplier":
-                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
-
+                    props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, SupplierDeserializer.class);
                     break;
                 default:
                     log.error("Wrong tpch tbl name {} !", flags.tableName);
                     System.exit(-1);
             }
+        } else if (null != flags.schemaFile) {
+            props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, CustomSchemaDeserializer.class);
         } else {
             // custom user schema
             props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, UserDeserializer.class);
