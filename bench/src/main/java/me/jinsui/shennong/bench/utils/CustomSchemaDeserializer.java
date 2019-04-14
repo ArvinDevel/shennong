@@ -12,6 +12,7 @@ import java.nio.file.Paths;
 import java.util.Map;
 import me.jinsui.shennong.bench.avro.User;
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryDecoder;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
@@ -20,7 +21,7 @@ import org.apache.avro.specific.SpecificRecordBase;
 import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.serialization.Deserializer;
 
-public class CustomSchemaDeserializer<T extends SpecificRecordBase> implements Deserializer<T> {
+public class CustomSchemaDeserializer<T extends GenericRecord> implements Deserializer<T> {
 
     Schema schema;
     private final String schemaStorePath = "schemaForKafka";
