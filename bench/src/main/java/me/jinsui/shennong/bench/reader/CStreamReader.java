@@ -40,6 +40,7 @@ import me.jinsui.shennong.bench.avro.Part;
 import me.jinsui.shennong.bench.avro.Partsupp;
 import me.jinsui.shennong.bench.avro.Supplier;
 import me.jinsui.shennong.bench.avro.User;
+import me.jinsui.shennong.bench.source.CustomDataSource;
 import me.jinsui.shennong.bench.utils.CliFlags;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.bookkeeper.api.StorageClient;
@@ -241,7 +242,12 @@ public class CStreamReader extends ReaderBase {
                         log.error("{} is Not standard tpch table", flags.tableName);
                 }
             } else {
-                valueTypedSchema = TypedSchemas.avroSchema(User.getClassSchema());
+                if (null != flags.schemaFile) {
+                    valueTypedSchema = TypedSchemas.avroSchema(
+                        new CustomDataSource(1, flags.schemaFile, 1).getSchema());
+                } else {
+                    valueTypedSchema = TypedSchemas.avroSchema(User.getClassSchema());
+                }
             }
             StreamConfig<byte[], GenericRecord> streamConfig = StreamConfig.<byte[], GenericRecord>builder()
                 .schema(StreamSchemaBuilder.<byte[], GenericRecord>builder()
