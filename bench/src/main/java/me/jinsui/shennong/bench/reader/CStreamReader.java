@@ -249,14 +249,14 @@ public class CStreamReader extends ReaderBase {
                     valueTypedSchema = TypedSchemas.avroSchema(User.getClassSchema());
                 }
             }
-            StreamConfig<byte[], GenericRecord> streamConfig = StreamConfig.<byte[], GenericRecord>builder()
-                .schema(StreamSchemaBuilder.<byte[], GenericRecord>builder()
-                    .key(TypedSchemas.bytes())
+            StreamConfig<Integer, GenericRecord> streamConfig = StreamConfig.<Integer, GenericRecord>builder()
+                .schema(StreamSchemaBuilder.<Integer, GenericRecord>builder()
+                    .key(TypedSchemas.int32())
                     .value(valueTypedSchema)
                     .build())
-                .keyRouter(BytesHashRouter.of())
+                .keyRouter(IntHashRouter.of())
                 .build();
-            List<Pair<Integer, Stream<byte[], GenericRecord>>> streams = new ArrayList<>(flags.numStreams);
+            List<Pair<Integer, Stream<Integer, GenericRecord>>> streams = new ArrayList<>(flags.numStreams);
             for (int i = 0; i < flags.numStreams; i++) {
                 String streamName;
                 if (-1 != flags.streamOrder) {
@@ -265,7 +265,7 @@ public class CStreamReader extends ReaderBase {
                     streamName = String.format(flags.streamName, i);
                 }
                 try {
-                    Stream<byte[], GenericRecord> stream =
+                    Stream<Integer, GenericRecord> stream =
                         FutureUtils.result(storageClient.openStream(streamName, streamConfig));
                     streams.add(Pair.of(i, stream));
                 } catch (StreamNotFoundException snfe) {
@@ -285,7 +285,7 @@ public class CStreamReader extends ReaderBase {
         }
     }
 
-    private void execute(List<Pair<Integer, Stream<byte[], GenericRecord>>> streams, int mode) throws Exception {
+    private void execute(List<Pair<Integer, Stream<Integer, GenericRecord>>> streams, int mode) throws Exception {
         // register shutdown hook to aggregate stats
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             isDone.set(true);
@@ -300,7 +300,7 @@ public class CStreamReader extends ReaderBase {
         try {
             for (int i = 0; i < flags.numThreads; i++) {
                 final int idx = i;
-                final List<Stream<byte[], GenericRecord>> logsThisThread = streams
+                final List<Stream<Integer, GenericRecord>> logsThisThread = streams
                     .stream()
                     .filter(pair -> pair.getLeft() % flags.numThreads == idx)
                     .map(pair -> pair.getRight())
@@ -339,18 +339,18 @@ public class CStreamReader extends ReaderBase {
     }
 
     // read used by specific thread
-    void read(List<Stream<byte[], GenericRecord>> streams) throws Exception {
+    void read(List<Stream<Integer, GenericRecord>> streams) throws Exception {
         ReaderConfig readerConfig = ReaderConfig.builder()
             .maxReadAheadCacheSize(flags.readAheadCatchSize).build();
-        List<CompletableFuture<Reader<byte[], GenericRecord>>> readerFutures = streams.stream()
+        List<CompletableFuture<Reader<Integer, GenericRecord>>> readerFutures = streams.stream()
             .map(stream -> stream.openReader(readerConfig, Position.HEAD))
             .collect(Collectors.toList());
-        List<Reader<byte[], GenericRecord>> readers = result(FutureUtils.collect(readerFutures));
+        List<Reader<Integer, GenericRecord>> readers = result(FutureUtils.collect(readerFutures));
         log.info("Read thread started with : logs = {}",
             streams.stream().map(stream -> stream.toString()).collect(Collectors.toList()));
 
         final int numLogs = streams.size();
-        ReadEvents<byte[], GenericRecord> readEvents;
+        ReadEvents<Integer, GenericRecord> readEvents;
         int backoffNum = 0;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
@@ -390,7 +390,7 @@ public class CStreamReader extends ReaderBase {
         }
     }
 
-    void readColumn(List<Stream<byte[], GenericRecord>> streams) throws Exception {
+    void readColumn(List<Stream<Integer, GenericRecord>> streams) throws Exception {
         String[] readFields =
             Iterables.toArray(Splitter.on(",").omitEmptyStrings().split(flags.readColumn), String.class);
         ArrayList<String> list = new ArrayList<>(Arrays.asList(readFields));
@@ -401,10 +401,10 @@ public class CStreamReader extends ReaderBase {
         ColumnReaderConfig readerConfig = ColumnReaderConfig.builder()
             .columns(list)
             .maxReadAheadCacheSize(flags.readAheadCatchSize).build();
-        List<CompletableFuture<ColumnReader<byte[], GenericRecord>>> readerFutures = streams.stream()
+        List<CompletableFuture<ColumnReader<Integer, GenericRecord>>> readerFutures = streams.stream()
             .map(stream -> stream.openColumnReader(readerConfig, Position.HEAD, Position.TAIL))
             .collect(Collectors.toList());
-        List<ColumnVectors<byte[], GenericRecord>> columnVectorsList;
+        List<ColumnVectors<Integer, GenericRecord>> columnVectorsList;
         columnVectorsList = result(FutureUtils.collect(readerFutures)).stream()
             .map(columnReader -> {
                     try {
@@ -420,7 +420,7 @@ public class CStreamReader extends ReaderBase {
             streams.stream().map(stream -> stream.toString()).collect(Collectors.toList()));
 
         final int numLogs = streams.size();
-        ColumnVectors<byte[], GenericRecord> columnVectors;
+        ColumnVectors<Integer, GenericRecord> columnVectors;
         int backoffNum = 0;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
@@ -452,18 +452,18 @@ public class CStreamReader extends ReaderBase {
     }
 
     // read monitered through prometheus stats
-    void readWithPrometheusMonitor(List<Stream<byte[], GenericRecord>> streams) throws Exception {
+    void readWithPrometheusMonitor(List<Stream<Integer, GenericRecord>> streams) throws Exception {
         ReaderConfig readerConfig = ReaderConfig.builder()
             .maxReadAheadCacheSize(flags.readAheadCatchSize).build();
-        List<CompletableFuture<Reader<byte[], GenericRecord>>> readerFutures = streams.stream()
+        List<CompletableFuture<Reader<Integer, GenericRecord>>> readerFutures = streams.stream()
             .map(stream -> stream.openReader(readerConfig, Position.HEAD))
             .collect(Collectors.toList());
-        List<Reader<byte[], GenericRecord>> readers = result(FutureUtils.collect(readerFutures));
+        List<Reader<Integer, GenericRecord>> readers = result(FutureUtils.collect(readerFutures));
         log.info("Read thread started with : logs = {}",
             streams.stream().map(stream -> stream.toString()).collect(Collectors.toList()));
 
         final int numLogs = streams.size();
-        ReadEvents<byte[], GenericRecord> readEvents;
+        ReadEvents<Integer, GenericRecord> readEvents;
         int backoffNum = 0;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
@@ -507,7 +507,7 @@ public class CStreamReader extends ReaderBase {
         }
     }
 
-    void readColumnWithPrometheusMonitor(List<Stream<byte[], GenericRecord>> streams) throws Exception {
+    void readColumnWithPrometheusMonitor(List<Stream<Integer, GenericRecord>> streams) throws Exception {
         String[] readFields =
             Iterables.toArray(Splitter.on(",").omitEmptyStrings().split(flags.readColumn), String.class);
         ArrayList<String> list = new ArrayList<String>(Arrays.asList(readFields));
@@ -518,10 +518,10 @@ public class CStreamReader extends ReaderBase {
         ColumnReaderConfig readerConfig = ColumnReaderConfig.builder()
             .columns(list)
             .maxReadAheadCacheSize(flags.readAheadCatchSize).build();
-        List<CompletableFuture<ColumnReader<byte[], GenericRecord>>> readerFutures = streams.stream()
+        List<CompletableFuture<ColumnReader<Integer, GenericRecord>>> readerFutures = streams.stream()
             .map(stream -> stream.openColumnReader(readerConfig, Position.HEAD, Position.TAIL))
             .collect(Collectors.toList());
-        List<ColumnVectors<byte[], GenericRecord>> columnVectorsList;
+        List<ColumnVectors<Integer, GenericRecord>> columnVectorsList;
         columnVectorsList = result(FutureUtils.collect(readerFutures)).stream()
             .map(columnReader -> {
                     try {
@@ -537,7 +537,7 @@ public class CStreamReader extends ReaderBase {
             streams.stream().map(stream -> stream.toString()).collect(Collectors.toList()));
 
         final int numLogs = streams.size();
-        ColumnVectors<byte[], GenericRecord> columnVectors;
+        ColumnVectors<Integer, GenericRecord> columnVectors;
         int backoffNum = 0;
         while (true) {
             for (int i = 0; i < numLogs; i++) {
