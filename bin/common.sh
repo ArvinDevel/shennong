@@ -200,7 +200,3 @@ build_cli_logging_opts() {
     -Dbookkeeper.cli.log.dir=${LOG_DIR} \
     -Dbookkeeper.cli.log.file=${LOG_FILE}"
 }
-
-build_bookie_opts() {
-  echo "-Djava.net.preferIPv4Stack=true"
-}
