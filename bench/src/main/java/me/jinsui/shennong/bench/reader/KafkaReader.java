@@ -299,6 +299,7 @@ public class KafkaReader extends ReaderBase {
         while (true) {
             for (KafkaConsumer consumer : consumersInThisThread) {
                 ConsumerRecords<Long, GenericRecord> records = consumer.poll(flags.pollTimeoutMs);
+                final long receiveTime = System.currentTimeMillis();
                 if (records.count() == 0 && flags.readEndless == 0) {
                     if (backoffNum > flags.maxBackoffNum) {
                         log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
@@ -315,6 +316,14 @@ public class KafkaReader extends ReaderBase {
                 cumulativeEventsRead.add(num);
                 // filter according to read column
                 for (ConsumerRecord<Long, GenericRecord> record : records) {
+                    long latencyMilli = receiveTime - record.timestamp();
+                    try {
+                        recorder.recordValue(latencyMilli);
+                        cumulativeRecorder.recordValue(latencyMilli);
+                    } catch (ArrayIndexOutOfBoundsException oobe) {
+                        log.error("receiveTime is {}, record.timestamp() is {}",
+                            receiveTime, record.timestamp());
+                    }
                     if (checkColumn) {
                         for (String field : readFields) {
                             Object data = record.value().get(field);
