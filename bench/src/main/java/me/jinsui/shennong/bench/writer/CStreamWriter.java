@@ -211,33 +211,19 @@ public class CStreamWriter extends WriterBase {
             } catch (ClientException ce) {
                 log.warn("create namespace fail ", ce);
             }
-            StorageAdminClient adminClientInternal = adminClient;
             for (int i = 0; i < flags.numStreams; i++) {
                 String streamName;
-                boolean createSucceed = false;
-                while (!createSucceed) {
-                    adminClientInternal =
-                        StorageClientBuilder.newBuilder()
-                            .withSettings(StorageClientSettings.newBuilder()
-                                .serviceUri(flags.url)
-                                .build())
-                            .buildAdmin();
-                    if (-1 != flags.streamOrder) {
-                        streamName = String.format(flags.streamName, flags.streamOrder);
-                    } else {
-                        streamName = String.format(flags.streamName, i);
-                    }
-                    try {
-                        FutureUtils.result(adminClientInternal.createStream(flags.namespaceName, streamName, streamConf));
-                    } catch (StreamExistsException see) {
-                        // swallow
-                    } catch (ClientException ce) {
-                        log.warn("create schema stream {} fail ", streamName, ce);
-                        adminClientInternal.closeAsync();
-                        continue;
-                    }
-                    createSucceed = true;
-                    adminClientInternal.closeAsync();
+                if (-1 != flags.streamOrder) {
+                    streamName = String.format(flags.streamName, flags.streamOrder);
+                } else {
+                    streamName = String.format(flags.streamName, i);
+                }
+                try {
+                    FutureUtils.result(adminClient.createStream(flags.namespaceName, streamName, streamConf));
+                } catch (StreamExistsException see) {
+                    // swallow
+                } catch (ClientException ce) {
+                    log.warn("create schema stream {} fail ", streamName, ce);
                 }
             }
             log.info("Successfully create schema streams, and begin open them");
