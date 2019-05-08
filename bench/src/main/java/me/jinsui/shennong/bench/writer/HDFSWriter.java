@@ -316,16 +316,18 @@ public class HDFSWriter extends WriterBase {
                 if (numRecordsForThisThread > 0
                     && totalWritten >= numRecordsForThisThread) {
                     writers.get(i).close();
+                    log.info("Generated msg number reach setting number, existing...");
                     markPerfDone();
                 }
                 if (numBytesForThisThread > 0
                     && totalBytesWritten >= numBytesForThisThread) {
+                    log.info("Generated msg size reach setting bytes, existing...");
                     writers.get(i).close();
                     markPerfDone();
                 }
-                totalWritten++;
-                totalBytesWritten += eventSize;
                 if (dataSource.hasNext()) {
+                    totalWritten++;
+                    totalBytesWritten += eventSize;
                     final long sendTime = System.nanoTime();
                     GenericRecord msg = dataSource.getNext();
                     if (0 == flags.bypass) {
@@ -429,16 +431,18 @@ public class HDFSWriter extends WriterBase {
                 if (numRecordsForThisThread > 0
                     && totalWritten >= numRecordsForThisThread) {
                     writers.get(i).close();
+                    log.info("Generated msg number reach setting number, existing...");
                     markPerfDone();
                 }
                 if (numBytesForThisThread > 0
                     && totalBytesWritten >= numBytesForThisThread) {
+                    log.info("Generated msg size reach setting bytes, existing...");
                     writers.get(i).close();
                     markPerfDone();
                 }
-                totalWritten++;
-                totalBytesWritten += eventSize;
                 if (dataSource.hasNext()) {
+                    totalWritten++;
+                    totalBytesWritten += eventSize;
                     final long sendTime = System.nanoTime();
                     GenericRecord msg = dataSource.getNext();
                     Summary.Timer requestTimer = writtenLats.startTimer();

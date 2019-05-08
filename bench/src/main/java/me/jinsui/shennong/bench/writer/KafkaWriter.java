@@ -263,15 +263,17 @@ public class KafkaWriter extends WriterBase {
             for (int i = 0; i < numStream; i++) {
                 if (numRecordsForThisThread > 0
                     && totalWritten >= numRecordsForThisThread) {
+                    log.info("Generated msg number reach setting number, existing...");
                     markPerfDone();
                 }
                 if (numBytesForThisThread > 0
                     && totalBytesWritten >= numBytesForThisThread) {
+                    log.info("Generated msg size reach setting bytes, existing...");
                     markPerfDone();
                 }
-                totalWritten++;
-                totalBytesWritten += eventSize;
                 if (dataSource.hasNext()) {
+                    totalWritten++;
+                    totalBytesWritten += eventSize;
                     final long sendTime = System.nanoTime();
                     try {
                         if (flags.valueType > 0) {
@@ -426,15 +428,17 @@ public class KafkaWriter extends WriterBase {
             for (int i = 0; i < numStream; i++) {
                 if (numRecordsForThisThread > 0
                     && totalWritten >= numRecordsForThisThread) {
+                    log.info("Generated msg number reach setting number, existing...");
                     markPerfDone();
                 }
                 if (numBytesForThisThread > 0
                     && totalBytesWritten >= numBytesForThisThread) {
+                    log.info("Generated msg size reach setting bytes, existing...");
                     markPerfDone();
                 }
-                totalWritten++;
-                totalBytesWritten += eventSize;
                 if (dataSource.hasNext()) {
+                    totalWritten++;
+                    totalBytesWritten += eventSize;
                     final long sendTime = System.nanoTime();
                     try {
                         if (flags.valueType > 0) {
