@@ -13,7 +13,6 @@
         <module>heron-kafka-connector</module>
         <module>dlog-bk-common-test</module>
         <module>utils</module>
-        <module>arrow-bk</module>
         <module>bench</module>
         <module>shennong-dist</module>
     </modules>
