@@ -22,3 +22,6 @@ and create topics with wanted replicas and topic name config.
 
 // kafka write and read e2e exp using multiple field with 3 replicas
 ./we2eKafkaGroupsBatch.sh 3 exp-kafka/groups/5-26
+
+// kafka write and read exp using one field(bytes different size) with 3 replicas
+./rwKafkaBytesBatch.sh 3 exp-kafka/bytes/5-27
