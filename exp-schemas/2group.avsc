@@ -1,0 +1,18 @@
+{
+   "type": "record",
+   "name": "groupRecord2",
+   "fields": [
+     {"name": "name", "type": "bytes"},
+     {"name": "age", "type": "int"},
+     {"name": "phone", "type": "float"},
+     {"name": "ctime", "type": "long"},
+     {"name": "weight", "type": "double"},
+     {"name": "address", "type": "boolean"},
+     {"name": "name1", "type": "bytes"},
+     {"name": "age1", "type": "int"},
+     {"name": "phone1", "type": "float"},
+     {"name": "ctime1", "type": "long"},
+     {"name": "weight1", "type": "double"},
+     {"name": "address1", "type": "boolean"}
+   ]
+ }

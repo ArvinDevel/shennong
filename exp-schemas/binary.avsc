@@ -1,0 +1,7 @@
+{
+  "type": "record",
+  "name": "CustomRecord",
+  "fields": [
+    {"name": "name", "type": "bytes"}
+  ]
+}

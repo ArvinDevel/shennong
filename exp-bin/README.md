@@ -2,6 +2,10 @@ A series shell script to execute experiments on CStream, Kafka and parquet over 
 The default number of running process to exp is customized for 12 physical core machine.
 
 ## 
+We use the customized schema to execute experiment, details schemas are on the dir `exp-schemas`.
+NOTE than when use the scripts related to these customized schema, you should modify the scripts to correct the location of the schema.
+`we2eKafkaBytesBatch` is used to write one field data to one kafka topic, and use multiple e2e reader reader from the topic.
+
 
 
 ## Basic utils

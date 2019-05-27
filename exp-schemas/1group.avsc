@@ -1,0 +1,12 @@
+{
+   "type": "record",
+   "name": "groupRecord1",
+   "fields": [
+   	 {"name": "name", "type": "bytes"},
+     {"name": "age", "type": "int"},
+     {"name": "phone", "type": "float"},
+     {"name": "ctime", "type": "long"},
+     {"name": "weight", "type": "double"},
+     {"name": "address", "type": "boolean"}
+	]
+ }
