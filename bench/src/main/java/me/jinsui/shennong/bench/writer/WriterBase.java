@@ -86,9 +86,9 @@ public abstract class WriterBase extends BenchBase {
     void printAggregatedStats(Recorder recorder) {
         long endTime = System.currentTimeMillis();
         double elapsed = (endTime - startTime) / 1e3;
-        log.debug("before calculate, start time {}, end time {}, elapsed {}, total event is {}",
+        log.info("before calculate, start time {}, end time {}, elapsed {}, total event is {}",
             startTime, endTime, elapsed, cumulativeEventsWritten.sum());
-        log.debug("before calculate total bytes is {}", cumulativeBytesWritten.sum());
+        log.info("before calculate total bytes is {}", cumulativeBytesWritten.sum());
         double rate = cumulativeEventsWritten.sum() / elapsed;
         double throughput = cumulativeBytesWritten.sum() / elapsed / 1024 / 1024;
 

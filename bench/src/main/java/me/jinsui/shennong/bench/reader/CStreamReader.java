@@ -380,7 +380,8 @@ public class CStreamReader extends ReaderBase {
                     backoffNum = 0;
                 } else if (flags.readEndless == 0) {
                     if (backoffNum > flags.maxBackoffNum) {
-                        log.info("No more data after {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                        log.info("No more data after {} ms, shut down, the cumulativeEventsRead is {}",
+                            flags.pollTimeoutMs * flags.maxBackoffNum, cumulativeEventsRead);
                         System.exit(-1);
                     } else {
                         backoffNum++;
@@ -439,7 +440,8 @@ public class CStreamReader extends ReaderBase {
                             backoffNum = 0;
                         } else if (flags.readEndless == 0) {
                             if (backoffNum > flags.maxBackoffNum) {
-                                log.info("No more data after continurous {} ms, shut down", flags.pollTimeoutMs * flags.maxBackoffNum);
+                                log.info("No more data after {} ms, shut down... the cumulativeEventsRead is {}",
+                                    flags.pollTimeoutMs * flags.maxBackoffNum,cumulativeEventsRead);
                                 System.exit(-1);
                             } else {
                                 backoffNum++;
