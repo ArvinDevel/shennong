@@ -44,8 +44,6 @@ import org.apache.bookkeeper.schema.TypedSchemas;
 import org.apache.bookkeeper.schema.proto.SchemaInfo;
 import org.apache.bookkeeper.schema.proto.SchemaType;
 import org.apache.bookkeeper.schema.proto.StructType;
-import org.apache.bookkeeper.stream.proto.ColumnGroup;
-import org.apache.bookkeeper.stream.proto.ColumnGroupDistribution;
 import org.apache.bookkeeper.stream.proto.NamespaceConfiguration;
 import org.apache.bookkeeper.stream.proto.StreamConfiguration;
 import org.apache.bookkeeper.stream.proto.StreamSchemaInfo;
@@ -337,28 +335,28 @@ public class CustomCGCStreamWriter extends WriterBase {
                 .build())
             .build();
         // set custom column group
-        ColumnGroup group1 = ColumnGroup.newBuilder()
-            .addFields("name")
-            .build();
-        ColumnGroup group2 = ColumnGroup.newBuilder()
-            .addFields("age")
-            .addFields("phone")
-            .addFields("ctime")
-            .build();
-        ColumnGroup group3 = ColumnGroup.newBuilder()
-            .addFields("weight")
-            .addFields("token")
-            .addFields("address")
-            .build();
-        ColumnGroupDistribution columnGroupDistribution = ColumnGroupDistribution.newBuilder()
-            .addColumnGroups(group1)
-            .addColumnGroups(group2)
-            .addColumnGroups(group3)
-            .build();
+//        ColumnGroup group1 = ColumnGroup.newBuilder()
+//            .addFields("name")
+//            .build();
+//        ColumnGroup group2 = ColumnGroup.newBuilder()
+//            .addFields("age")
+//            .addFields("phone")
+//            .addFields("ctime")
+//            .build();
+//        ColumnGroup group3 = ColumnGroup.newBuilder()
+//            .addFields("weight")
+//            .addFields("token")
+//            .addFields("address")
+//            .build();
+//        ColumnGroupDistribution columnGroupDistribution = ColumnGroupDistribution.newBuilder()
+//            .addColumnGroups(group1)
+//            .addColumnGroups(group2)
+//            .addColumnGroups(group3)
+//            .build();
 
         return StreamConfiguration.newBuilder(DEFAULT_STREAM_CONF)
             .setSchemaInfo(streamSchemaInfo)
-            .setCgDist(columnGroupDistribution)
+//            .setCgDist(columnGroupDistribution)
             .setMinNumRanges(flags.minNumRanges)
             .setInitialNumRanges(flags.initNumRanges)
             .build();
