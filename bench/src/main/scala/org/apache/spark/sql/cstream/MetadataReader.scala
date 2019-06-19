@@ -2,7 +2,7 @@ package org.apache.spark.sql.cstream
 
 import java.io.Closeable
 
-import org.apache.bookkeeper.api.stream.Position
+import org.apache.bookkeeper.clients.impl.stream.event.StreamPositionImpl
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.types.StructType
 
@@ -34,15 +34,11 @@ class MetadataReader(options: CStreamOptions) extends Closeable with Logging {
     dt.asInstanceOf[StructType]
   }
 
-  def getStartPos(): Position = {
+  def getStartPos(): StreamPositionImpl = {
 
   }
 
-  def getEndPos(): Position = {
-
-  }
-
-  def getEntryCount(): Long = {
+  def getEndPos(): StreamPositionImpl = {
 
   }
 

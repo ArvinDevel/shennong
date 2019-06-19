@@ -21,7 +21,11 @@ class CStreamOptions(@transient val parameters: CaseInsensitiveMap[String]) exte
 
   val url = parameters(CS_URL)
   val tbl = parameters(CS_TBL)
+  val streamName = parameters(CS_STREAM)
   val parallelism = parameters(CS_PARALLELISM).toInt
+  val namespace = parameters(CS_NAMESPACE)
+  val readAheadCacheSize = parameters(CS_READAHEADCACHESIZE).toLong
+  val pollTimeoutMs = parameters(CS_POLLTIMEOUTMS).toLong
 }
 
 
@@ -38,6 +42,9 @@ object CStreamOptions {
   val CS_TBL  = newOption("tableName")
   val CS_STREAM = newOption("streamName")
   val CS_PARALLELISM = newOption("parallelism")
+  val CS_NAMESPACE = newOption("namespace")
+  val CS_READAHEADCACHESIZE = newOption("readAheadCacheSize")
+  val CS_POLLTIMEOUTMS = newOption("pollTimeoutMs")
 
 }
 
