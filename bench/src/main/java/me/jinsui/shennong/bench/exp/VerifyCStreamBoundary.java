@@ -116,14 +116,14 @@ public class VerifyCStreamBoundary extends WriterBase {
                 "-inr", "--init-num-ranges"
             },
             description = "Number of init ranges of the stream")
-        public int initNumRanges = 1;
+        public int initNumRanges = 2;
 
         @Parameter(
             names = {
                 "-mnr", "--min-num-ranges"
             },
             description = "Number of min ranges of the stream")
-        public int minNumRanges = 1;
+        public int minNumRanges = 2;
 
         @Parameter(
             names = {
@@ -350,29 +350,9 @@ public class VerifyCStreamBoundary extends WriterBase {
                 .setSchema(schema)
                 .build())
             .build();
-        // set custom column group
-//        ColumnGroup group1 = ColumnGroup.newBuilder()
-//            .addFields("name")
-//            .build();
-//        ColumnGroup group2 = ColumnGroup.newBuilder()
-//            .addFields("age")
-//            .addFields("phone")
-//            .addFields("ctime")
-//            .build();
-//        ColumnGroup group3 = ColumnGroup.newBuilder()
-//            .addFields("weight")
-//            .addFields("token")
-//            .addFields("address")
-//            .build();
-//        ColumnGroupDistribution columnGroupDistribution = ColumnGroupDistribution.newBuilder()
-//            .addColumnGroups(group1)
-//            .addColumnGroups(group2)
-//            .addColumnGroups(group3)
-//            .build();
 
         return StreamConfiguration.newBuilder(DEFAULT_STREAM_CONF)
             .setSchemaInfo(streamSchemaInfo)
-//            .setCgDist(columnGroupDistribution)
             .setMinNumRanges(flags.minNumRanges)
             .setInitialNumRanges(flags.initNumRanges)
             .build();
