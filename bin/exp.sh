@@ -36,4 +36,4 @@ OPTS="${OPTS} -cp ${BENCH_CLASSPATH} ${GC_OPTS} ${LOGGING_OPTS} ${BENCH_EXTRA_OP
 
 #Change to SN_HOME to support relative paths
 cd "$SN_HOME"
-exec ${JAVA} ${OPTS} me.jinsui.shennong.bench.exp.VerifySSE $@
+exec ${JAVA} ${OPTS} me.jinsui.shennong.bench.exp.Exp $@
