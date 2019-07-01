@@ -10,7 +10,7 @@ import org.apache.avro.generic.GenericRecord
 import org.apache.bookkeeper.api.stream.{ColumnReaderConfig, Position, StreamConfig}
 import org.apache.bookkeeper.clients.impl.stream.event.EventPositionImpl
 import org.apache.bookkeeper.common.concurrent.FutureUtils
-
+import org.apache.bookkeeper.stream.protocol.RangeId
 import org.apache.spark.{Partition, SparkContext, TaskContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
@@ -94,7 +94,7 @@ class CStreamRDD(
     }
   }
 
-  case class RangeSE(id: Long, start: EventPositionImpl, end: EventPositionImpl) {
+  case class RangeSE(id: RangeId, start: EventPositionImpl, end: EventPositionImpl) {
     def length = end.getRangeSeqNum - start.getRangeSeqNum
   }
 
@@ -103,13 +103,10 @@ class CStreamRDD(
       (reader.getStartPos(), reader.getEndPos())
     }
 
-    val rangesStart = start.getRangePositions.asScala
-    val rangesEnd = end.getRangePositions.asScala
-
-    val ranges = rangesStart.keys.map { rid =>
+    val ranges = start.keys.map { rid =>
       RangeSE(rid,
-        rangesStart.getOrElse(rid, throw new RuntimeException),
-        rangesEnd.getOrElse(rid, throw new RuntimeException(s"Range $rid doesn't have an end")))
+        start.getOrElse(rid, throw new RuntimeException),
+        end.getOrElse(rid, throw new RuntimeException(s"Range $rid doesn't have an end")))
     }
 
     val totalLength = ranges.foldLeft(0L)((accum, element) => accum + element.length)
